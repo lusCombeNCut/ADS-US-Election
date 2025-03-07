@@ -1,0 +1,16 @@
+#!/bin/bash
+#SBATCH --job-name=bertinf
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:1
+#SBATCH --partition=gpu
+#SBATCH --account=COMS034664
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=60G
+#SBATCH --ntasks-per-node=1
+#SBATCH --mail-user=ek22528@bristol.ac.uk
+#SBATCH --mail-type=ALL
+#SBATCH --time=02-00:00:00
+#SBATCH --out=bert%j.out
+
+module load apptainer/1.1.9-qwwi
+apptainer exec --nv --bind /user/work/ek22528:/user/work/ek22528 pytorch_latest.sif ./bert_run p4 $CUDA_VISIBLE_DEVICES

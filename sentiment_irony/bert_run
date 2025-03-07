@@ -1,0 +1,4 @@
+cd /user/work/ek22528/ads
+pip install --user pysentimiento
+export CUDA_VISIBLE_DEVICES=$2
+python sentiment.py $1 $2
