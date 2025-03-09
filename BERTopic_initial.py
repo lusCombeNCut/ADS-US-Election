@@ -9,15 +9,10 @@ from sentence_transformers import SentenceTransformer
 import umap
 import umap.umap_ as umap_module
 import numpy as np
-from sklearn.feature_extraction.text import CountVectorizer
 import sys
 import time
-import matplotlib.pyplot as plt
-from sklearn.metrics.pairwise import cosine_similarity
 import os
 import glob
-import geopandas as gpd
-from shapely.geometry import Point
 
 MAX_NUM_FILES = 20  # Limit to a subset of files for this run
 
@@ -41,6 +36,7 @@ def patched_spectral_layout(data, graph, n_components, random_state, **kwargs):
         return eigenvectors[:, :n_components]
     else:
         return orig_spectral_layout(data, graph, n_components, random_state, **kwargs)
+    
 umap_module.spectral_layout = patched_spectral_layout
 
 # Download necessary NLTK resources
@@ -49,9 +45,11 @@ nltk.download("stopwords")
 nltk.download("wordnet")    
 
 # Define stopwords and lemmatizer
-CUSTOM_IGNORE_WORDS = {"rt", "amp", "ni", "el", "la", "nada", "de", "para", "al", "con", "le", "ver", "hay", "eu", "en", "se", "va", "trump", "biden", "joe", "donald"}
+CUSTOM_IGNORE_WORDS = {"rt", "amp", "ni", "el", "la", "nada", "de", "para", "al", "con", "le", "ver", "hay", "eu", "en", "se", "va"}
+
 stop_words = set(stopwords.words("english")).union(CUSTOM_IGNORE_WORDS)
 stop_words = list(stop_words)
+
 lemmatizer = WordNetLemmatizer()
 
 def is_english_word(word):
@@ -170,15 +168,11 @@ topic_model = BERTopic(
 start_time = time.perf_counter()
 topics, probabilities = topic_model.fit_transform(processed_tweets)
 end_time = time.perf_counter()
+
 total_time = end_time - start_time
 avg_time_per_tweet = total_time / len(processed_tweets)
 print(f"Total topic modeling time: {total_time:.2f} seconds")
 print(f"Average time per tweet: {avg_time_per_tweet:.4f} seconds")
-
-unique_topics = np.unique(topics)
-if len(unique_topics) <= 1:
-    print("Too few topics detected! Try adjusting parameters or using more diverse data.")
-    exit(1)
 
 topic_info_df = topic_model.get_topic_info()
 print(topic_info_df)
