@@ -1,0 +1,8 @@
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+export PYTHONPATH="/user/home/ne22902/ADS:$PYTHONPATH"
+
+cd /user/home/ne22902/ADS
+
+pip install --prefix=$HOME/.local nltk contractions bertopic pandas
+
+python 2024-bert.py
