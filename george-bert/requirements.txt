@@ -1,0 +1,4 @@
+bertopic==0.16.4
+contractions==0.1.73
+nltk==3.9.1
+pandas==2.2.3
