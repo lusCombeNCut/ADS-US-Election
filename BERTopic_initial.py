@@ -7,8 +7,9 @@ from bertopic import BERTopic
 from sentence_transformers import SentenceTransformer
 import umap
 from hdbscan import HDBSCAN
+from bertopic.representation import KeyBERTInspired
 
-MAX_NUM_FILES = 5
+MAX_NUM_FILES = 20
 CUSTOM_IGNORE_WORDS = {"rt", "amp"}
 MIN_LIKES = 5
 MIN_RETWEETS = 0
@@ -40,15 +41,18 @@ def filter_data(df):
 def run_topic_model_fitting(docs, embedding_model):
     embeddings = embedding_model.encode(docs, show_progress_bar=True)
 
-    custom_umap = umap.UMAP(n_neighbors=50, n_components=5, metric="cosine", init="random", random_state=42)
+    representation_model = KeyBERTInspired()
+
+    custom_umap = umap.UMAP(n_neighbors=10, n_components=5, metric="cosine", init="random", random_state=42)
     custom_hdbscan = HDBSCAN(min_samples=20, gen_min_span_tree=True, prediction_data=True, core_dist_n_jobs=5)
 
     topic_model = BERTopic(
+        representation_model=representation_model,
         embedding_model=embedding_model,
         umap_model=custom_umap,
         hdbscan_model=custom_hdbscan,
         language="english",
-        nr_topics="10",
+        nr_topics="auto",
         calculate_probabilities=True,
         verbose=True,
     )
@@ -60,13 +64,14 @@ def run_topic_model_fitting(docs, embedding_model):
         pickle.dump(embeddings, f)
     
     return topic_model, embeddings, topics, probs
-
-def main():
+def get_docs():
     folder_path = r"C:\Users\Orlan\Documents\Applied-Data-Science\part_1"
     df = load_data(folder_path)
     df = filter_data(df)
     docs  = df["processed_text"].tolist()
+    return docs, df
 
+def main():
     if '-y' not in sys.argv:
         user_input = input("Continue analysis with these tweets? (yes/no): ")
         if user_input.lower().strip() not in ['yes', 'y']:
@@ -84,17 +89,20 @@ def main():
             topic_model = BERTopic.load(MODEL_PATH)
         else:
             print("Re-running the fitting process...")
+            docs, df = get_docs()
             topic_model, embeddings, topics, probs = run_topic_model_fitting(docs, embedding_model)
     else:
         print("No saved model/embeddings found. Running the fitting process...")
+        docs, df = get_docs()
         topic_model, embeddings, topics, probs = run_topic_model_fitting(docs, embedding_model)
 
-    print(topic_model.get_topic_info())
+    info = topic_model.get_topic_info()
+    print(info)
 
     # fig = topic_model.visualize_documents(docs, embeddings=embeddings, sample=100)
     # fig.show()
 
-    fig = topic_model.visualize_barchart()
+    fig = topic_model.visualize_barchart(top_n_topics=info.shape[0])
     fig.show()
 
     timestamps = df['date_parsed'].tolist()
