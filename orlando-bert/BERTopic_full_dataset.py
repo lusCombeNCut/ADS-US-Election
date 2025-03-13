@@ -7,8 +7,8 @@ import umap
 from hdbscan import HDBSCAN
 from bertopic.representation import KeyBERTInspired
 
-MIN_LIKES = 5
-MIN_RETWEETS = 0
+MIN_LIKES = 20
+MIN_RETWEETS = 3
 
 def load_data(root_folder):
     all_files = []
@@ -19,10 +19,11 @@ def load_data(root_folder):
     
     print("number of files", len(all_files))
 
-    # dfs = [pd.read_csv(f, compression="gzip") for f in all_files]
+    dfs = [pd.read_csv(f, compression="gzip") for f in all_files]
 
-    f = all_files[0]
-    dfs = [pd.read_csv(f, compression="gzip")]
+    # # ~~~ For local testing load the first file only ~~~
+    # f = all_files[0]
+    # dfs = [pd.read_csv(f, compression="gzip")]
 
     combined_df = pd.concat(dfs, ignore_index=True)
     combined_df = filter_data(combined_df)
@@ -77,9 +78,11 @@ def run_topic_model_fitting(docs, embedding_model):
 
 if __name__ == "__main__":
     
+    # ~~~ Local paths ~~~
     main_dir = r'C:\Users\Orlan\Documents\usc-x-24-us-election-main'
     save_dir = r"C:\Users\Orlan\Documents\Applied-Data-Science\orlando-bert"
 
+    # # ~~~ Bluecrystal paths ~~~
     # save_dir = "/user/work/sv22482/ADS/models"
     # main_dir = '/user/work/sv22482/usc-x-24-us-election'
 
