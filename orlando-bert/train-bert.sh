@@ -17,4 +17,4 @@ cd "${SLURM_SUBMIT_DIR}"
 
 module load apptainer/1.1.9-qwwi
 
-apptainer exec --nv --bind /user/work/sv22482:/user/work/sv22482 /user/work/sv22482/pytorch_latest.sif ./bert
+apptainer exec --nv --bind /user/work/sv22482:/user/work/sv22482 /user/work/sv22482/pytorch-latest.sif ./bert
