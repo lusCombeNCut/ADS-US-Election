@@ -18,31 +18,39 @@ def load_data(root_folder):
         all_files.extend(glob.glob(file_pattern))
     
     print("number of files", len(all_files))
-    dfs = [pd.read_csv(f, compression="gzip") for f in all_files]
-    df = filter_data(df)
-    docs = df["processed_text"].tolist()
-    return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame(), docs
+
+    # dfs = [pd.read_csv(f, compression="gzip") for f in all_files]
+
+    f = all_files[0]
+    dfs = [pd.read_csv(f, compression="gzip")]
+
+    combined_df = pd.concat(dfs, ignore_index=True)
+    combined_df = filter_data(combined_df)
+    docs = combined_df["processed_text"].tolist()
+
+    return combined_df, docs
 
 def filter_data(df):
     print(f"Total tweets prefiltering: {df.shape[0]}")
+    df['date_parsed'] = pd.to_datetime(df['date'], errors='coerce')
     df = df[(df['likeCount'] >= MIN_LIKES) & (df['retweetCount'] >= MIN_RETWEETS)]
     print(f"Tweets after thresholding: {df.shape[0]}")
+
     df = df.sort_values('epoch').drop_duplicates(subset=['conversationId'], keep='first')
     print(f"Tweets after selecting first per conversation: {df.shape[0]}")
+
     df = df[(df['lang'] == 'en') & (df["text"].notna())]
     df["processed_text"] = df["text"]
     df = df.dropna(subset=["processed_text"])
     df = df[df["processed_text"].str.strip() != ""].reset_index(drop=True)
     print(f"Tweets after processing: {df.shape[0]}")
+
     return df
 
-def save_model(save_dir, model, df):
-    columns_to_save = ["id", "topic", "topic_probs"]
-
-    model.save(f"{save_dir}/bertopic_model")
-
-    df[columns_to_save].to_csv(
-        f'{save_dir}/topics.csv.gz', index=False, compression="gzip")
+def save_model(save_dir, model: BERTopic, df):
+    columns_to_save = ["id", "topic"] + [f"topic_prob_{i}" for i in range(probs.shape[1])]
+    model.save(f"{save_dir}/bertopic_model", serialization="pytorch")
+    df[columns_to_save].to_csv(f'{save_dir}/topics.csv.gz', index=False, compression="gzip")
     
 def run_topic_model_fitting(docs, embedding_model):
     embeddings = embedding_model.encode(docs, show_progress_bar=True)
@@ -69,36 +77,44 @@ def run_topic_model_fitting(docs, embedding_model):
 
 if __name__ == "__main__":
     
-    save_dir = "/user/work/sv22482/ADS/models"
+    main_dir = r'C:\Users\Orlan\Documents\usc-x-24-us-election-main'
+    save_dir = r"C:\Users\Orlan\Documents\Applied-Data-Science\orlando-bert"
 
-    new_version = "version_" + \
-        str(max([int(folder[8:])
-                 for folder in os.listdir(save_dir)], default=0) + 1)
+    # save_dir = "/user/work/sv22482/ADS/models"
+    # main_dir = '/user/work/sv22482/usc-x-24-us-election'
 
-    save_dir += f'/{new_version}'
+    # new_version = "version_" + \
+    #     str(max([int(folder[8:])
+    #              for folder in os.listdir(save_dir)], default=0) + 1)
+
+    # save_dir += f'/{new_version}'
 
     os.makedirs(save_dir, exist_ok=True)
-
-    main_dir = '/user/work/sv22482/usc-x-24-us-election'
-
+    df, docs = load_data(main_dir)
+    
     embedding_model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2", device="cuda")
-
-    df, docs = load_data()
     topic_model, embeddings, topics, probs = run_topic_model_fitting(docs, embedding_model)
+
+
+    df['topic'] = topics
+    for i in range(probs.shape[1]):
+        df[f'topic_prob_{i}'] = probs[:, i]
+
+    save_model(save_dir, topic_model, df)
+
+    timestamps = df['date_parsed'].tolist()
 
     info = topic_model.get_topic_info()
 
     fig = topic_model.visualize_barchart(top_n_topics=info.shape[0])
-    fig.write_html("barchart.png")
+    fig.write_html("barchart.html")
 
-    timestamps = df['date_parsed'].tolist()
     topics_over_time = topic_model.topics_over_time(docs, timestamps)
-    fig.write_html("topics_over_time.png")
+    fig.write_html("topics_over_time.html")
 
     fig = topic_model.visualize_topics_over_time(topics_over_time)
-    fig.write_html("topics_over_time.png")
+    fig.write_html("topics_over_time.html")
 
     fig = topic_model.visualize_topics()
-    fig.write_html("topics.png")
+    fig.write_html("topics.html")
 
-    save_model(save_dir, topic_model, df)
