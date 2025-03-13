@@ -78,19 +78,19 @@ def run_topic_model_fitting(docs, embedding_model):
 
 if __name__ == "__main__":
     
-    # ~~~ Local paths ~~~
-    main_dir = r'C:\Users\Orlan\Documents\usc-x-24-us-election-main'
-    save_dir = r"C:\Users\Orlan\Documents\Applied-Data-Science\orlando-bert"
+    # # ~~~ Local paths ~~~
+    # main_dir = r'C:\Users\Orlan\Documents\usc-x-24-us-election-main'
+    # save_dir = r"C:\Users\Orlan\Documents\Applied-Data-Science\orlando-bert"
 
-    # # ~~~ Bluecrystal paths ~~~
-    # save_dir = "/user/work/sv22482/ADS/models"
-    # main_dir = '/user/work/sv22482/usc-x-24-us-election'
+    # ~~~ Bluecrystal paths ~~~
+    save_dir = "/user/work/sv22482/ADS/models"
+    main_dir = '/user/work/sv22482/usc-x-24-us-election'
 
-    # new_version = "version_" + \
-    #     str(max([int(folder[8:])
-    #              for folder in os.listdir(save_dir)], default=0) + 1)
+    new_version = "version_" + \
+        str(max([int(folder[8:])
+                 for folder in os.listdir(save_dir)], default=0) + 1)
 
-    # save_dir += f'/{new_version}'
+    save_dir += f'/{new_version}'
 
     os.makedirs(save_dir, exist_ok=True)
     df, docs = load_data(main_dir)
