@@ -1,7 +1,5 @@
 import os
-import sys
 import glob
-import pickle
 import pandas as pd
 from bertopic import BERTopic
 from sentence_transformers import SentenceTransformer
@@ -9,39 +7,24 @@ import umap
 from hdbscan import HDBSCAN
 from bertopic.representation import KeyBERTInspired
 
-MAX_NUM_FILES = 20
-CUSTOM_IGNORE_WORDS = {"rt", "amp"}
 MIN_LIKES = 5
 MIN_RETWEETS = 0
 
-# File paths for saving/loading
-MODEL_PATH = "saved_bertopic_model"
-EMBEDDINGS_PATH = "saved_embeddings.pkl"
-
-def load_data(root_folder, max_files=MAX_NUM_FILES):
+def load_data(root_folder):
     all_files = []
     
-    # Iterate through all part_* folders
     for part_folder in glob.glob(os.path.join(root_folder, "part_*")):
         file_pattern = os.path.join(part_folder, "*.csv.gz")
         all_files.extend(glob.glob(file_pattern))
     
-    # # Limit the number of files to read
-    # all_files = all_files[:max_files]
     print("number of files", len(all_files))
     dfs = [pd.read_csv(f, compression="gzip") for f in all_files]
-    return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame()
-
-def get_docs():
-    folder_path = r"C:\Users\Orlan\Documents\usc-x-24-us-election-main"
-    df = load_data(folder_path)
     df = filter_data(df)
     docs = df["processed_text"].tolist()
-    return docs, df
+    return pd.concat(dfs, ignore_index=True) if dfs else pd.DataFrame(), docs
 
 def filter_data(df):
     print(f"Total tweets prefiltering: {df.shape[0]}")
-    df['date_parsed'] = pd.to_datetime(df['date'], errors='coerce')
     df = df[(df['likeCount'] >= MIN_LIKES) & (df['retweetCount'] >= MIN_RETWEETS)]
     print(f"Tweets after thresholding: {df.shape[0]}")
     df = df.sort_values('epoch').drop_duplicates(subset=['conversationId'], keep='first')
@@ -53,6 +36,14 @@ def filter_data(df):
     print(f"Tweets after processing: {df.shape[0]}")
     return df
 
+def save_model(save_dir, model, df):
+    columns_to_save = ["id", "topic", "topic_probs"]
+
+    model.save(f"{save_dir}/bertopic_model")
+
+    df[columns_to_save].to_csv(
+        f'{save_dir}/topics.csv.gz', index=False, compression="gzip")
+    
 def run_topic_model_fitting(docs, embedding_model):
     embeddings = embedding_model.encode(docs, show_progress_bar=True)
 
@@ -73,56 +64,41 @@ def run_topic_model_fitting(docs, embedding_model):
     )
     
     topics, probs = topic_model.fit_transform(documents=docs, embeddings=embeddings)
-
-    topic_model.save(MODEL_PATH)
-    with open(EMBEDDINGS_PATH, "wb") as f:
-        pickle.dump(embeddings, f)
     
     return topic_model, embeddings, topics, probs
 
-def main():
-    if '-y' not in sys.argv:
-        user_input = input("Continue analysis with these tweets? (yes/no): ")
-        if user_input.lower().strip() not in ['yes', 'y']:
-            print("Exiting analysis.")
-            return
+if __name__ == "__main__":
+    
+    save_dir = "/user/work/sv22482/ADS/models"
 
-    embedding_model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2")
+    new_version = "version_" + \
+        str(max([int(folder[8:])
+                 for folder in os.listdir(save_dir)], default=0) + 1)
 
-    if os.path.exists(MODEL_PATH) and os.path.exists(EMBEDDINGS_PATH):
-        load_choice = input("Saved topic model and embeddings found. Load them? (yes/no): ")
-        if load_choice.lower().strip() in ['yes', 'y']:
-            print("Loading saved embeddings and topic model...")
-            with open(EMBEDDINGS_PATH, "rb") as f:
-                embeddings = pickle.load(f)
-            topic_model = BERTopic.load(MODEL_PATH)
-        else:
-            print("Re-running the fitting process...")
-            docs, df = get_docs()
-            topic_model, embeddings, topics, probs = run_topic_model_fitting(docs, embedding_model)
-    else:
-        print("No saved model/embeddings found. Running the fitting process...")
-        docs, df = get_docs()
-        topic_model, embeddings, topics, probs = run_topic_model_fitting(docs, embedding_model)
+    save_dir += f'/{new_version}'
+
+    os.makedirs(save_dir, exist_ok=True)
+
+    main_dir = '/user/work/sv22482/usc-x-24-us-election'
+
+    embedding_model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2", device="cuda")
+
+    df, docs = load_data()
+    topic_model, embeddings, topics, probs = run_topic_model_fitting(docs, embedding_model)
 
     info = topic_model.get_topic_info()
-    print(info)
-
-    # fig = topic_model.visualize_documents(docs, embeddings=embeddings, sample=100)
-    # fig.show()
 
     fig = topic_model.visualize_barchart(top_n_topics=info.shape[0])
-    fig.show()
+    fig.write_html("barchart.png")
 
     timestamps = df['date_parsed'].tolist()
     topics_over_time = topic_model.topics_over_time(docs, timestamps)
+    fig.write_html("topics_over_time.png")
 
     fig = topic_model.visualize_topics_over_time(topics_over_time)
-    fig.show()
+    fig.write_html("topics_over_time.png")
 
     fig = topic_model.visualize_topics()
-    fig.show()
+    fig.write_html("topics.png")
 
-
-if __name__ == "__main__":
-    main()
+    save_model(save_dir, topic_model, df)
