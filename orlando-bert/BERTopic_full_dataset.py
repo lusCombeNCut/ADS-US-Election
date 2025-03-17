@@ -79,11 +79,11 @@ def run_topic_model_fitting(docs, embedding_model):
 if __name__ == "__main__":
     
     # # ~~~ Local paths ~~~
-    # main_dir = r'C:\Users\Orlan\Documents\usc-x-24-us-election-main'
+    # main_dir = r'C:\Users\Orlan\Documents\usc-x-24-us-election'
     # save_dir = r"C:\Users\Orlan\Documents\Applied-Data-Science\orlando-bert"
 
     # ~~~ Bluecrystal paths ~~~
-    save_dir = "/user/work/sv22482/ADS/models"
+    save_dir = "/user/work/sv22482/ADS"
     main_dir = '/user/work/sv22482/usc-x-24-us-election'
 
     new_version = "version_" + \
