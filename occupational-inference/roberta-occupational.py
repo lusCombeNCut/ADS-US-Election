@@ -183,8 +183,8 @@ def infer_occupations(description):
 
 if __name__ == "__main__":
 
-    main_dir = '../data'
-    dirs = ['part_1/may_july.gz']
+    main_dir = '.'  # current directory
+    dirs = ['data/may_july.gz']
 
     try:
         df = load_dataset(main_dir, dirs)
@@ -197,7 +197,7 @@ if __name__ == "__main__":
     df = df[df['quotedTweet'] == False]
     df = df[df['likeCount'] >= 5]
     df = df.dropna(subset=['text'])
-    df = df.head(50)
+    df = df.head(50) # CHANGE THIS TO ENTIRE TWEET SET
     print(f"Number of tweets to analyze: {df.shape[0]}")
 
     print("Cleaning tweet text...")
