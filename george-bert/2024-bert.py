@@ -3,12 +3,14 @@ import glob
 import re
 import nltk
 from nltk.stem import WordNetLemmatizer
+from sklearn.feature_extraction.text import CountVectorizer
 from nltk.corpus import stopwords, wordnet
 from nltk.tokenize import word_tokenize
 from nltk import pos_tag, word_tokenize
 import contractions
 from bertopic import BERTopic
 import os
+from sentence_transformers import SentenceTransformer
 
 
 nltk.download('stopwords')
@@ -21,11 +23,9 @@ TOP_ISSUES = ['economy', 'health care', 'supreme court appointment', 'foreign po
 
 
 # Could probably be condensed - Try SpaCy
-stop_word = set(stopwords.words('english')) - {"not", "no", "should", "must"}
-spanish_words = set(stopwords.words('spanish'))
-stop_word = stop_word.union({'joe', 'biden', 'donald', 'trump', 'don', 'el', 'en', 'que', 'para', 'hay', 'de', 'la', 'il', 'et',
-                            'na', 'ng', 'un', 'se', 'los', 'del', 'di', 'sur', 'su', 'una', 'como', 'por', 'al', 'ch', 'abd', 'srail', 'bir', 'er', 'ti'})
-stop_word = stop_word.union(spanish_words)
+stop_word = list(set(stopwords.words('english')) -
+                 {"not", "no", "should", "must"})
+
 lemmatiser = WordNetLemmatizer()
 
 
@@ -61,16 +61,19 @@ def clean_text(text):
     text = word_tokenize(text, 'english')
     text = [lemmatiser.lemmatize(
         word, pos=get_wordnet_pos(word)) for word in text]
-    text = [token for token in text if token not in stop_word]
 
     return " ".join(text)
 
 
 def model_topics(df):
+    vectoriser = CountVectorizer(stop_words=stop_word)
+    embedding_model = SentenceTransformer("vinai/bertweet-base")
     topic_model = BERTopic(
-        language='english', calculate_probabilities=True,
+        embedding_model=embedding_model,
+        vectorizer_model=vectoriser,
         verbose=True,
-        seed_topic_list=TOP_ISSUES
+        low_memory=True,
+        n_gram_range=(1, 3)
     )
     topics, probs = topic_model.fit_transform(df["clean_text"])
 
@@ -78,12 +81,9 @@ def model_topics(df):
 
 
 def save_model(save_dir, model, df):
-    columns_to_save = ["id", "clean_text", "topic", "topic_probs"]
-
-    model.save(f"{save_dir}/bertopic_model")
-
-    df[columns_to_save].to_csv(
-        f'{save_dir}/topics.csv.gz', index=False, compression="gzip")
+    df.to_csv(
+        f'{save_dir}/topics.csv', columns=["id", "clean_text", "topic", "prob"], index=False, compression='gzip')
+    model.save(f"{save_dir}/bertopic_model", serialization='pytorch')
 
 
 if __name__ == "__main__":
@@ -102,6 +102,7 @@ if __name__ == "__main__":
     df = df[df['retweetedTweet'] == False]
     df = df[df['quotedTweet'] == False]
     df = df[df['likeCount'] >= 5]
+    df = df[df['lang'] == 'en']
     df = df.dropna(subset=['text'])
     print(f"Number of tweets to analyse: {df.shape[0]}")
 
@@ -109,6 +110,5 @@ if __name__ == "__main__":
 
     topic_model, topics, probs = model_topics(df)
     df['topic'] = topics
-    df['topic_probs'] = probs
-
+    df['prob'] = probs
     save_model(save_dir, topic_model, df)
