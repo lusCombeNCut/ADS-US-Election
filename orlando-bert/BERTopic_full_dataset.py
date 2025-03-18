@@ -52,70 +52,62 @@ def initialize_topic_model(embedding_model):
     topic_model = BERTopic(
         representation_model=representation_model,
         embedding_model=embedding_model,
-        umap_model=online_dim_reducer,        # Replacing UMAP with IncrementalPCA
-        hdbscan_model=online_cluster,          # Replacing HDBSCAN with MiniBatchKMeans
-        vectorizer_model=online_vectorizer,      # Online count vectorizer for updating vocabulary
+        umap_model=online_dim_reducer,       # Replacing UMAP with IncrementalPCA
+        hdbscan_model=online_cluster,         # Replacing HDBSCAN with MiniBatchKMeans
+        vectorizer_model=online_vectorizer,   # Online count vectorizer for updating vocabulary
         language="english",
         nr_topics="auto",
-        calculate_probabilities=True,
+        calculate_probabilities=False,       # No probabilities needed
         verbose=True,
     )
     return topic_model
 
 def process_batches(main_dir, embedding_model):
-    """Process data in batches and update the BERTopic model incrementally."""
+    """Process data in batches and update the BERTopic model incrementally.
+    Returns the combined dataframe with topic assignments.
+    """
     topic_model = None
     all_dfs = []
     
     for i, (df_batch, docs_batch) in enumerate(load_data_batches(main_dir)):
         print(f"\nProcessing batch {i+1} with {len(docs_batch)} documents")
-        # Get embeddings for the current batch
         embeddings_batch = embedding_model.encode(docs_batch, show_progress_bar=True)
         if i == 0:
-            # Initialize model on the first batch
             topic_model = initialize_topic_model(embedding_model)
-            topics, probs = topic_model.fit_transform(documents=docs_batch, embeddings=embeddings_batch)
+            topics, _ = topic_model.fit_transform(documents=docs_batch, embeddings=embeddings_batch)
         else:
-            # Incrementally update model for the new batch
-            topics, probs = topic_model.partial_fit(documents=docs_batch, embeddings=embeddings_batch)
-        # Store topics and probabilities in the batch dataframe
+            topics, _ = topic_model.partial_fit(documents=docs_batch, embeddings=embeddings_batch)
         df_batch['topic'] = topics
-        for j in range(probs.shape[1]):
-            df_batch[f'topic_prob_{j}'] = probs[:, j]
         all_dfs.append(df_batch)
     
     combined_df = pd.concat(all_dfs, ignore_index=True)
     return topic_model, combined_df
 
-def save_model(save_dir, model: BERTopic, df, probs):
-    """Save the model and topic assignments."""
-    columns_to_save = ["id", "topic"] + [f"topic_prob_{i}" for i in range(probs.shape[1])]
+def save_model(save_dir, model: BERTopic, df):
+    """Save the model and topic assignments (without probabilities)."""
+    # Save only "id" (if available) and "topic" columns.
+    columns_to_save = ["id", "topic"] if "id" in df.columns else ["topic"]
     model.save(f"{save_dir}/bertopic_model", serialization="pytorch")
     df[columns_to_save].to_csv(f'{save_dir}/topics.csv.gz', index=False, compression="gzip")
 
 if __name__ == "__main__":
-
-    save_dir = "/user/work/sv22482/ADS"
+    base_save_dir = "/user/work/sv22482/ADS"
     main_dir = '/user/work/sv22482/usc-x-24-us-election'
     
     # Filter for folders that match the expected version pattern "version_<number>"
-    version_folders = [folder for folder in os.listdir(save_dir) 
+    version_folders = [folder for folder in os.listdir(base_save_dir) 
                        if folder.startswith("version_") and folder[8:].isdigit()]
     new_version_number = max([int(folder[8:]) for folder in version_folders], default=0) + 1
     new_version = "version_" + str(new_version_number)
-    save_dir = os.path.join(save_dir, new_version)
+    save_dir = os.path.join(base_save_dir, new_version)
     os.makedirs(save_dir, exist_ok=True)
     
-    # Load the embedding model
     embedding_model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2", device="cuda")
     
-    # Process data in batches and update the topic model incrementally
     topic_model, combined_df = process_batches(main_dir, embedding_model)
     
-    # Save the model and combined dataframe (using one batch's probabilities as an example)
-    topic_prob_cols = [col for col in combined_df.columns if col.startswith("topic_prob_")]
-    probs_example = combined_df[topic_prob_cols].values
-    save_model(save_dir, topic_model, combined_df, probs_example)
+    # Save the model and combined dataframe (only topics)
+    save_model(save_dir, topic_model, combined_df)
     
     # Visualization (using combined data)
     timestamps = combined_df['date_parsed'].tolist()
