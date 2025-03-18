@@ -34,23 +34,21 @@ def extract_raw_description(val):
         return None
     
 
-# csv_file = 'small_chunk.csv'
-csv_file = 'aug_chunk_41.csv'
+csv_file = 'small_chunk.csv'
+# csv_file = 'aug_chunk_41.csv'
 
-jsonl_file = 'aug_chunk_41.jsonl'
+jsonl_file = 'small_chunk.jsonl'
+# jsonl_file = 'aug_chunk_41.jsonl'
 
 
 df = pd.read_csv(csv_file)
 
 with open(jsonl_file, 'w') as f:
     for _, row in df.iterrows():
-        # Get the language; if it's 'zxx', assign a default value like 'en'
         lang = value_or_null(row.get('lang'))
-        if lang == 'zxx' or lang is None:
+        if lang == 'zxx' or lang == 'und' or lang == 'qme' or lang is None:
             continue
-        #     lang = "en"  # or any default value you prefer
-        # if lang != 'en':
-        #     continue
+
 
         entry = {
             'id': None if pd.isna(row['id']) else str(row['id']),
