@@ -6,7 +6,7 @@ import pandas as pd
 from bertopic import BERTopic
 from sentence_transformers import SentenceTransformer
 from bertopic.representation import KeyBERTInspired
-from bertopic.vectorizers import OnlineCountVectorizer
+from sklearn.feature_extraction.text import CountVectorizer
 from umap import UMAP
 import hdbscan
 import nltk
@@ -18,7 +18,7 @@ MIN_LIKES = 10
 MIN_RETWEETS = 0
 
 # Sampling parameters
-SAMPLE_FRAC = 0.1  # Adjust the fraction as needed
+SAMPLE_FRAC = 0.01  # Adjust the fraction as needed
 SAMPLE_SEED = 42   # Fixed seed for reproducibility
 
 # Combine custom stop words with NLTK stop words
@@ -66,8 +66,8 @@ def filter_data(df):
 
 def load_data_sampled(root_folder, sample_frac=SAMPLE_FRAC, seed=SAMPLE_SEED):
     """
-    Load CSV files from each 'part_*' folder, filter the data,
-    and sample a fixed fraction from each part using a fixed seed.
+    Load CSV files from each 'part_*' folder, sample a fixed fraction from the raw data,
+    and then filter the sampled data for reproducibility and efficiency.
     """
     part_folders = sorted(glob.glob(os.path.join(root_folder, "part_*")))
     sampled_dfs = []
@@ -79,16 +79,14 @@ def load_data_sampled(root_folder, sample_frac=SAMPLE_FRAC, seed=SAMPLE_SEED):
             continue
         dfs = [pd.read_csv(f, compression="gzip") for f in files]
         combined_df = pd.concat(dfs, ignore_index=True)
-        combined_df = filter_data(combined_df)
-        # Sample a fraction from this part for reproducibility
+        # Sample a fraction from the raw data using a fixed seed
         sampled_df = combined_df.sample(frac=sample_frac, random_state=seed)
+        # Now filter only the sampled data
+        sampled_df = filter_data(sampled_df)
         sampled_dfs.append(sampled_df)
-    
-    if sampled_dfs:
-        full_df = pd.concat(sampled_dfs, ignore_index=True)
-        return full_df
-    else:
-        return pd.DataFrame()
+
+    full_df = pd.concat(sampled_dfs, ignore_index=True)
+    return full_df
 
 
 def initialize_topic_model(embedding_model):
@@ -98,8 +96,8 @@ def initialize_topic_model(embedding_model):
     # Standard UMAP settings
     umap_model = UMAP(n_neighbors=15, n_components=5, metric='cosine', random_state=42)
     # Standard HDBSCAN settings
-    hdbscan_model = hdbscan.HDBSCAN(min_cluster_size=10, metric='euclidean', cluster_selection_method='eom')
-    custom_vectorizer = OnlineCountVectorizer(stop_words=custom_stop_words, ngram_range=(1, 2), min_df=3)
+    hdbscan_model = hdbscan.HDBSCAN(min_cluster_size=50, metric='cosine', cluster_selection_method='eom')
+    custom_vectorizer = CountVectorizer(stop_words=custom_stop_words, ngram_range=(1, 3), min_df=3)
     
     topic_model = BERTopic(
         representation_model=representation_model,
@@ -108,7 +106,7 @@ def initialize_topic_model(embedding_model):
         hdbscan_model=hdbscan_model,
         vectorizer_model=custom_vectorizer,
         language="english",
-        nr_topics=None,
+        nr_topics="auto",
         calculate_probabilities=False,
         verbose=True,
     )
@@ -116,10 +114,6 @@ def initialize_topic_model(embedding_model):
 
 
 def process_data_sampled(main_dir, embedding_model, sample_frac=SAMPLE_FRAC, seed=SAMPLE_SEED):
-    """
-    Load and sample data from all parts in one batch, compute embeddings,
-    and fit the BERTopic model.
-    """
     print("Loading and sampling data from parts...")
     combined_df = load_data_sampled(main_dir, sample_frac, seed)
     docs = combined_df["processed_text"].tolist()
@@ -144,8 +138,8 @@ if __name__ == "__main__":
     base_save_dir = "/user/home/sv22482/work/ADS-US-Election/orlando-bert/ADS"
     main_dir = "/user/work/sv22482/usc-x-24-us-election"
 
-    # Local paths for testing (uncomment if needed)
-    # base_save_dir = r"C:\Users\Orlan\Documents\Applied-Data-Science\ADS"
+    # # Local paths for testing (uncomment if needed)
+    # base_save_dir = r"C:\Users\Orlan\Documents\Applied-Data-Science"
     # main_dir = r"C:\Users\Orlan\Documents\usc-x-24-us-election-main"
 
     parser = argparse.ArgumentParser(description="BERTopic Batch Training or Loading a Saved Model")
@@ -192,5 +186,5 @@ if __name__ == "__main__":
     fig.write_html(os.path.join(base_save_dir, f"heatmap_{version_str}.html"))
 
     topics_over_time = topic_model.topics_over_time(docs, timestamps, nr_bins=20)
-    fig = topic_model.visualize_topics_over_time(docs, timestamps, top_n_topics=8)
+    fig = topic_model.visualize_topics_over_time(topics_over_time, top_n_topics=8)
     fig.write_html(os.path.join(base_save_dir, f"topics_over_time_{version_str}.html"))
