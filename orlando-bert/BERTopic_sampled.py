@@ -96,7 +96,7 @@ def initialize_topic_model(embedding_model):
     # Standard UMAP settings
     umap_model = UMAP(n_neighbors=15, n_components=5, metric='cosine', random_state=42)
     # Standard HDBSCAN settings
-    hdbscan_model = hdbscan.HDBSCAN(min_cluster_size=50, metric='cosine', cluster_selection_method='eom')
+    hdbscan_model = hdbscan.HDBSCAN(min_cluster_size=50)
     custom_vectorizer = CountVectorizer(stop_words=custom_stop_words, ngram_range=(1, 3), min_df=3)
     
     topic_model = BERTopic(
@@ -134,13 +134,13 @@ def save_model(save_dir, topic_model: BERTopic, df):
 
 
 if __name__ == "__main__":
-    # HPC paths
-    base_save_dir = "/user/home/sv22482/work/ADS-US-Election/orlando-bert/ADS"
-    main_dir = "/user/work/sv22482/usc-x-24-us-election"
+    # # HPC paths
+    # base_save_dir = "/user/home/sv22482/work/ADS-US-Election/orlando-bert/ADS"
+    # main_dir = "/user/work/sv22482/usc-x-24-us-election"
 
-    # # Local paths for testing (uncomment if needed)
-    # base_save_dir = r"C:\Users\Orlan\Documents\Applied-Data-Science"
-    # main_dir = r"C:\Users\Orlan\Documents\usc-x-24-us-election-main"
+    # Local paths for testing (uncomment if needed)
+    base_save_dir = r"C:\Users\Orlan\Documents\Applied-Data-Science"
+    main_dir = r"C:\Users\Orlan\Documents\usc-x-24-us-election-main"
 
     parser = argparse.ArgumentParser(description="BERTopic Batch Training or Loading a Saved Model")
     parser.add_argument("--load_model", type=str, default=None,
@@ -185,6 +185,18 @@ if __name__ == "__main__":
     fig = topic_model.visualize_heatmap()
     fig.write_html(os.path.join(base_save_dir, f"heatmap_{version_str}.html"))
 
-    topics_over_time = topic_model.topics_over_time(docs, timestamps, nr_bins=20)
+    # Define the cutoff date
+    cutoff_date = pd.Timestamp("2024-01-01")
+
+    # Filter the combined DataFrame (which has topic assignments) to only include data from 2024 onward
+    filtered_df = combined_df[combined_df['date_parsed'] >= cutoff_date]
+
+    # Extract the filtered docs and timestamps
+    docs_filtered = filtered_df["processed_text"].tolist()
+    timestamps_filtered = filtered_df["date_parsed"].tolist()
+
+    # Now compute topics over time with the filtered data
+    topics_over_time = topic_model.topics_over_time(docs_filtered, timestamps_filtered, nr_bins=20)
     fig = topic_model.visualize_topics_over_time(topics_over_time, top_n_topics=8)
     fig.write_html(os.path.join(base_save_dir, f"topics_over_time_{version_str}.html"))
+
