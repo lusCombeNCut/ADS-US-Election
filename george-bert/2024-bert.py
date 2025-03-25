@@ -10,7 +10,8 @@ from nltk import pos_tag, word_tokenize
 import contractions
 from bertopic import BERTopic
 import os
-from sentence_transformers import SentenceTransformer
+from transformers import AutoModel, AutoTokenizer
+import torch
 
 
 nltk.download('stopwords')
@@ -27,6 +28,22 @@ stop_word = list(set(stopwords.words('english')) -
                  {"not", "no", "should", "must"})
 
 lemmatiser = WordNetLemmatizer()
+
+
+tokenizer = AutoTokenizer.from_pretrained("vinai/bertweet-base")
+model = AutoModel.from_pretrained("vinai/bertweet-base")
+
+# Define custom embedding function for BERTopic
+
+
+def bertweet_embedding(texts):
+    """Generate embeddings for a list of texts using vinai/bertweet-base."""
+    with torch.no_grad():
+        inputs = tokenizer(texts, padding=True,
+                           truncation=True, return_tensors="pt")
+        outputs = model(**inputs)
+        # CLS token embedding
+        return outputs.last_hidden_state[:, 0, :].cpu().numpy()
 
 
 def load_dataset(main_dir, dirs):
@@ -54,7 +71,7 @@ def clean_text(text):
     text = text.lower()
     text = contractions.fix(text)
     text = re.sub("@[A-Za-z0-9_]+", "", text)
-    text = re.sub('#[A-Za-z0-9_]+', '', text)
+    text = re.sub('#', '', text)
     text = re.sub(r'http\S+', '', text)
     text = re.sub(r'www.\S+', '', text)
     text = re.sub("[^a-z0-9]", " ", text)
@@ -67,9 +84,8 @@ def clean_text(text):
 
 def model_topics(df):
     vectoriser = CountVectorizer(stop_words=stop_word)
-    embedding_model = SentenceTransformer("vinai/bertweet-base")
     topic_model = BERTopic(
-        embedding_model=embedding_model,
+        embedding_model=bertweet_embedding,
         vectorizer_model=vectoriser,
         verbose=True,
         low_memory=True,
