@@ -7,6 +7,6 @@ def unzip_gz_file(input_file, output_file):
             shutil.copyfileobj(f_in, f_out)
 
 if __name__ == "__main__":
-    input_file = r'C:\Users\Orlan\Documents\Applied-Data-Science\orlando-bert\topics.csv.gz'
+    input_file = r'C:\Users\Orlan\Documents\Applied-Data-Science\orlando-bert\version_3\topics.csv.gz'
     output_file = r'file.csv'
     unzip_gz_file(input_file, output_file)
