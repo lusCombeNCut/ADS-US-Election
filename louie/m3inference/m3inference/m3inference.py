@@ -125,10 +125,10 @@ class M3Inference:
             data = data_or_datapath
         # prediction
 
-        # dataloader = DataLoader(M3InferenceDataset(data, use_img=self.use_full_model), batch_size,
-        #                         num_workers=num_workers, pin_memory=True)
         dataloader = DataLoader(M3InferenceDataset(data, use_img=self.use_full_model), batch_size,
-                                num_workers=0, pin_memory=True)
+                                num_workers=num_workers, pin_memory=True)
+        # dataloader = DataLoader(M3InferenceDataset(data, use_img=self.use_full_model), batch_size,
+        #                         num_workers=0, pin_memory=True)
         y_pred = []
         with torch.no_grad():
             for batch in tqdm(dataloader, desc='Predicting...', disable=logging.root.level>=logging.WARN):
