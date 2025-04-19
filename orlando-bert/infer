@@ -1,0 +1,8 @@
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+export PYTHONPATH="/user/home/$USER/:$PYTHONPATH"
+
+cd /user/home/sv22482/work/ADS-US-Election/orlando-bert
+
+pip install --prefix=$HOME/.local nltk contractions bertopic pandas emoji==0.6.0
+
+python inference.py
