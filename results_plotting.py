@@ -1,21 +1,24 @@
 import json
 import pandas as pd
+import plotly.express as px
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import pearsonr
+from glob import glob
 
 # =============================================================================
 # 1. Load Topic Representations from JSON
 # =============================================================================
 topics_path = 'orlando-bert/version_3/bertopic_model/topics.json'
-results_path = 'BERTTopic_sentiment_irony.csv'
+inference_results_path = 'orlando-bert/topic-inference-results.csv'
+merged_path = 'merged_results_topicDates.csv'
 polling_path = 'presidential_primary_averages_2024.csv'
+sentiment_path = 'sentiment_results'
 
 with open(topics_path, 'r') as f:
     topics_data = json.load(f)
 
 # Build a dictionary mapping each topic code to a descriptive label.
-# We use the top term (first string) for each topic.
 topics_dict = {}
 for topic_code, reps in topics_data.get("topic_representations", {}).items():
     if reps:
@@ -26,136 +29,132 @@ for topic_code, reps in topics_data.get("topic_representations", {}).items():
 # =============================================================================
 # 2. Load and Explore the Tweet Data
 # =============================================================================
-tweets_df = pd.read_csv(results_path)
-tweets_df['date'] = pd.to_datetime(tweets_df['date'])
+merged_df = pd.read_csv(merged_path)
+merged_df['date_parsed'] = pd.to_datetime(merged_df['date_parsed'])
+merged_df['topic_label'] = merged_df['topic'].astype(str).map(topics_dict)
+merged_df['week'] = merged_df['date_parsed'].dt.to_period('W').astype(str)  # Convert to string
+weekly_tweet_volume = merged_df.groupby(merged_df['week']).size().reset_index(name='tweet_count')
+weekly_tweet_volume['source'] = 'Merged With sentiment and irony'
 
-print("=== Tweet Data Summary ===")
-print("Total number of tweet entries:", len(tweets_df))
-print("Tweet Data Columns:", tweets_df.columns.tolist())
-print("\nSample of Tweet Data:")
-print(tweets_df.head())
+inference_df = pd.read_csv(inference_results_path)
+inference_df['date_parsed'] = pd.to_datetime(inference_df['date_parsed'])
+inference_df['week'] = inference_df['date_parsed'].dt.to_period('W').astype(str)  # Convert to string
+inference_weekly_tweet_volume = inference_df.groupby(inference_df['week']).size().reset_index(name='tweet_count')
+inference_weekly_tweet_volume['source'] = 'Isolated Topic Inference'
 
-# Map tweet topic codes to descriptive labels.
-tweets_df['topic_label'] = tweets_df['topic'].astype(str).map(topics_dict)
+# Combine the two dataframes
+combined_df = pd.concat([weekly_tweet_volume, inference_weekly_tweet_volume])
 
-print("\n=== Sentiment Distribution ===")
-print(tweets_df['sentiment'].value_counts())
-print("\n=== Irony Distribution ===")
-print(tweets_df['irony'].value_counts())
-print("\n=== Topic Distribution (by code) ===")
-print(tweets_df['topic'].value_counts())
+# Normalize tweet counts by weekly tweet volume (scaled between 0 and 1)
+max_tweet_count = weekly_tweet_volume['tweet_count'].max()
+min_tweet_count = weekly_tweet_volume['tweet_count'].min()
+combined_df['normalized_tweet_count'] = (combined_df['tweet_count'] - min_tweet_count) / (max_tweet_count - min_tweet_count)
 
-# =============================================================================
-# 3. Visualize the Tweet Data
-# =============================================================================
-# # -- Daily Tweet Volume --
-# daily_tweet_volume = tweets_df.groupby(tweets_df['date'].dt.date).size()
-# plt.figure(figsize=(10, 5))
-# plt.plot(daily_tweet_volume.index, daily_tweet_volume.values, marker='o')
-# plt.title("Daily Tweet Volume")
-# plt.xlabel("Date")
-# plt.ylabel("Number of Tweets")
-# plt.xticks(rotation=45)
-# plt.tight_layout()
-# plt.show()
-
-# -- EMA Smoothed Sentiment Proportions --
-daily_sentiments = tweets_df.groupby(tweets_df['date'].dt.date)['sentiment'].value_counts(normalize=True).unstack().fillna(0)
-ema_span = 7  # 7-day exponential moving average
-daily_sentiments_ema = daily_sentiments.ewm(span=ema_span).mean()
-
-# plt.figure(figsize=(10, 5))
-# for sentiment in daily_sentiments_ema.columns:
-#     plt.plot(daily_sentiments_ema.index, daily_sentiments_ema[sentiment], marker='o', label=sentiment)
-# plt.title("EMA Smoothed Sentiment Proportions")
-# plt.xlabel("Date")
-# plt.ylabel("Proportion of Tweets")
-# plt.legend()
-# plt.xticks(rotation=45)
-# plt.tight_layout()
-# plt.show()
-
-# # -- Topic Distribution Bar Plot (Top N Topics) --
-# topic_counts = tweets_df['topic'].value_counts()
-# top_n = 10
-# top_topics = topic_counts.sort_values(ascending=False).head(top_n)
-
-# plt.figure(figsize=(10, 5))
-# plt.bar(top_topics.index.astype(str), top_topics.values)
-# plt.title(f"Top {top_n} Topics by Tweet Count")
-# plt.xlabel("Topic Code")
-# plt.ylabel("Number of Tweets")
-# plt.xticks(rotation=45)
-# plt.tight_layout()
-# plt.show()
+# Plot the histogram with different colors for each source
+fig7 = px.bar(combined_df, x='week', y='normalized_tweet_count', color='source', barmode='group', title="Number of Tweets per Week (Normalized)")
+fig7.update_xaxes(tickangle=45)
+fig7.update_layout(title_text="Normalized Number of Tweets per Week (Combined)")
+fig7.show()
 
 # =============================================================================
-# 4. Additional Analyses Ideas (Printed)
+# 4. Visualizations
 # =============================================================================
-print("\n=== Additional Analyses Ideas ===")
-print("""
-1. Time Series by Topic:
-   - Group tweets by 'topic' or 'topic_label' and plot sentiment trends over time.
-2. Event-Centric Analysis:
-   - Overlay key political events (e.g., debates, election day) on time series plots.
-3. Irony vs. Sentiment:
-   - Explore the frequency and impact of ironic tweets across sentiment classes.
-4. Correlation with External Data:
-   - Overlay traditional polling data or election odds with social media sentiment.
-5. Advanced Visualizations:
-   - Create interactive dashboards (using Plotly or Dash) for multifaceted analysis.
-6. Demographic Inference:
-   - Integrate demographic data (if available) to study group-specific political engagement.
-""")
+# -- 1. Most Common Topic Each Week --
+weekly_topic_counts = merged_df.groupby(['week', 'topic_label']).size().reset_index(name='tweet_count')
+# Normalize tweet counts by weekly tweet volume
+weekly_topic_counts = pd.merge(weekly_topic_counts, weekly_tweet_volume, on='week', how='left')
+weekly_topic_counts['normalized_tweet_count'] = weekly_topic_counts['tweet_count_x'] / weekly_topic_counts['tweet_count_y']
 
-# =============================================================================
-# 5. Load and Summarize the Polling Data (2024 Only & Selected Candidates)
-# =============================================================================
+fig1 = px.line(weekly_topic_counts, x='week', y='normalized_tweet_count', color='topic_label', title='Most Common Topic Each Week (Normalized)')
+fig1.update_xaxes(tickangle=45)
+fig1.show()
+
+# -- 2. Sentiment for Each Topic Over Time (Top 5 Topics) --
+top_topics = merged_df['topic_label'].value_counts().head(5).index
+filtered_df = merged_df[merged_df['topic_label'].isin(top_topics)]
+weekly_sentiment = filtered_df.groupby([filtered_df['date_parsed'].dt.to_period('W').astype(str), 'topic_label', 'sentiment']).size().reset_index(name='tweet_count')
+
+# Normalize sentiment data by weekly tweet volume
+weekly_sentiment = pd.merge(weekly_sentiment, weekly_tweet_volume, left_on='date_parsed', right_on='week', how='left')
+weekly_sentiment['normalized_tweet_count'] = weekly_sentiment['tweet_count_x'] / weekly_sentiment['tweet_count_y']
+
+fig2 = px.line(weekly_sentiment, x='date_parsed', y='normalized_tweet_count', color='sentiment', facet_col='topic_label', title="Sentiment Over Time for Top 5 Topics (Normalized)")
+fig2.update_xaxes(tickangle=45)
+fig2.show()
+
+# -- 3. Correlation Between Polling Changes and Topics --
 poll_df = pd.read_csv(polling_path)
 poll_df['date'] = pd.to_datetime(poll_df['date'])
 
-# Filter to 2024 only (if 'cycle' exists)
-if 'cycle' in poll_df.columns:
-    poll_df = poll_df[poll_df['cycle'] == 2024]
+# Filter for 2024 and selected candidates (e.g., Biden and Trump)
+poll_df = poll_df[(poll_df['cycle'] == 2024) & (poll_df['candidate'].isin(['Trump', 'Biden']))]
 
-# IMPORTANT: Filter only for 'national' in the state column.
-if 'state' in poll_df.columns:
-    poll_df = poll_df[poll_df['state'].str.lower() == 'national']
+# Calculate weekly delta in polling for Biden
+biden_poll = poll_df[poll_df['candidate'] == "Biden"]
+biden_poll['week'] = biden_poll['date'].dt.to_period('W').astype(str)  # Convert to string
+biden_poll['poll_delta'] = biden_poll['pct_estimate'].diff()
+
+# Calculate weekly topic proportions
+topic_proportions = merged_df.groupby([merged_df['date_parsed'].dt.to_period('W').astype(str), 'topic_label']).size().unstack().fillna(0)
+topic_proportions = topic_proportions.div(topic_proportions.sum(axis=1), axis=0)  # Normalize
+
+# Merge polling data with topic proportions
+merged_df = pd.merge(biden_poll, topic_proportions, left_on='week', right_index=True)
+
+# Calculate correlation between polling change and each topic
+for topic in topic_proportions.columns:
+    # Align data for Pearson correlation
+    aligned_data = merged_df[['poll_delta', topic]].dropna()
     
-print("\n=== Polling Data After Filtering (2024, state='national') ===")
-print("Total polling rows after filtering:", poll_df.shape[0])
-print("Polling Data Columns:", poll_df.columns.tolist())
-print("\nSample of Polling Data:")
-print(poll_df.head())
-print("\nPolling Data Summary:")
-print(poll_df.describe(include='all'))
+    # Calculate Pearson correlation
+    if aligned_data.shape[0] > 1:  # Ensure there are at least two data points
+        correlation = pearsonr(aligned_data['poll_delta'], aligned_data[topic])
+        print(f"Correlation between polling change and {topic}: {correlation[0]}")
+    else:
+        print(f"Not enough data to calculate correlation for {topic}.")
 
-# Limit polling data to the selected candidates.
-selected_candidates = ["Trump", "Biden"]
-poll_df = poll_df[poll_df['candidate'].isin(selected_candidates)]
+# -- 4. Correlation Between Polling and Sentiment --
+weekly_sentiment_change = merged_df.groupby([merged_df['date_parsed'].dt.to_period('W').astype(str), 'sentiment']).size().unstack().fillna(0)
+weekly_sentiment_change = weekly_sentiment_change.div(weekly_sentiment_change.sum(axis=1), axis=0)
 
-print("\n=== Polling Data Summary (Selected Candidates) ===")
-for candidate in poll_df['candidate'].unique():
-    candidate_poll_df = poll_df[poll_df['candidate'] == candidate]
-    print(f"\nCandidate: {candidate}")
-    print(candidate_poll_df.describe(include='all'))
-    print(candidate_poll_df.head())
+# Merge with polling data
+merged_sentiment_poll = pd.merge(biden_poll, weekly_sentiment_change, left_on='week', right_index=True)
+
+# Calculate correlation between polling change and sentiment
+for sentiment in ['POS', 'NEU', 'NEG']:
+    # Align data for Pearson correlation
+    aligned_sentiment = merged_sentiment_poll[['poll_delta', sentiment]].dropna()
+    
+    if aligned_sentiment.shape[0] > 1:  # Ensure there are at least two data points
+        correlation = pearsonr(aligned_sentiment['poll_delta'], aligned_sentiment[sentiment])
+        print(f"Correlation between polling change and {sentiment} sentiment: {correlation[0]}")
+    else:
+        print(f"Not enough data to calculate correlation for {sentiment} sentiment.")
+
+# -- 5. Correlation Between Topics and Irony --
+weekly_irony = merged_df.groupby([merged_df['date_parsed'].dt.to_period('W').astype(str), 'irony']).size().unstack().fillna(0)
+weekly_irony = weekly_irony.div(weekly_irony.sum(axis=1), axis=0)
+
+# Merge irony distribution with topic data
+merged_irony_topic = pd.merge(weekly_irony, topic_proportions, left_index=True, right_index=True)
+
+# Calculate correlation between irony 'not ironic' and topic 0
+correlation = pearsonr(merged_irony_topic['not ironic'].dropna(), merged_irony_topic[0].dropna())
+print(f"Correlation between irony and topic 0: {correlation[0]}")
 
 # =============================================================================
-# 6. Dual Y-Axis Plot: Social Media Positive Sentiment vs. Polling Trends
+# 6. Dual Y-Axis Plot: Social Media Positive Sentiment vs. Polling Trends (For Trump)
 # =============================================================================
-# For demonstration, we plot data for one selected candidate; adjust as needed.
-selected_candidate_for_plot = "Biden"
+selected_candidate_for_plot = "Trump"
 poll_candidate = poll_df[poll_df['candidate'] == selected_candidate_for_plot]
 daily_poll = poll_candidate.groupby(poll_candidate['date'].dt.date)['pct_estimate'].mean()
 
-fig, ax1 = plt.subplots(figsize=(12, 6))
-if 'POS' in daily_sentiments_ema.columns:
+fig3, ax1 = plt.subplots(figsize=(12, 6))
+if 'POS' in weekly_sentiment_change.columns:
     color1 = 'tab:blue'
     ax1.set_xlabel('Date')
     ax1.set_ylabel('Positive Sentiment (EMA)', color=color1)
-    ax1.plot(daily_sentiments_ema.index, daily_sentiments_ema['POS'], marker='o', color=color1,
-             label='Positive Sentiment (EMA)')
+    ax1.plot(weekly_sentiment_change.index, weekly_sentiment_change['POS'], marker='o', color=color1, label='Positive Sentiment (EMA)')
     ax1.tick_params(axis='y', labelcolor=color1)
 else:
     print("No 'POS' sentiment column found in the tweet data.")
@@ -163,86 +162,30 @@ else:
 ax2 = ax1.twinx()
 color2 = 'tab:red'
 ax2.set_ylabel('Polling Estimate (%)', color=color2)
-ax2.plot(daily_poll.index, daily_poll.values, marker='s', linestyle='--', color=color2,
-         label=f'Polling Estimate: {selected_candidate_for_plot}')
+ax2.plot(daily_poll.index, daily_poll.values, marker='s', linestyle='--', color=color2, label=f'Polling Estimate: {selected_candidate_for_plot}')
 ax2.tick_params(axis='y', labelcolor=color2)
 
 plt.title("Social Media Positive Sentiment vs. Polling Trends\nCandidate: " + selected_candidate_for_plot)
-fig.tight_layout()
+fig3.tight_layout()
 plt.xticks(rotation=45)
 plt.show()
 
 # =============================================================================
-# 7. Build Correlation Matrix: Topic & Candidate Changes (Selected Candidates Only)
+# 7. Interactive Plot for Political Events
 # =============================================================================
-# For each topic (from the tweet data) and for each candidate (from the polling data),
-# compute the Pearson correlation between the day-to-day change in the proportion of tweets
-# with 'POS' sentiment for that topic and the day-to-day change in the candidate's polling estimates.
-unique_topics = tweets_df['topic'].astype(str).unique()
-unique_candidates = poll_df['candidate'].unique()
+# Add a political event for illustration (e.g., assassination attempt)
+events = pd.DataFrame({
+    'date': ['2024-05-15'],
+    'event': ['Assassination Attempt'],
+})
 
-# Create an empty dictionary to store correlation coefficients.
-corr_data = {cand: {} for cand in unique_candidates}
+# Plot with political event annotations
+fig4 = px.line(weekly_topic_counts, x='week', y='normalized_tweet_count', color='topic_label', title='Most Common Topic Each Week (Normalized)')
 
-for topic in unique_topics:
-    topic_df = tweets_df[tweets_df['topic'].astype(str) == topic]
-    # Daily proportion of 'POS' tweets for the topic.
-    daily_topic_sent = topic_df.groupby(topic_df['date'].dt.date)['sentiment'].apply(lambda x: np.mean(x == 'POS'))
-    daily_topic_sent_change = daily_topic_sent.diff().dropna()
-    
-    for cand in unique_candidates:
-        cand_poll_df = poll_df[poll_df['candidate'] == cand]
-        daily_cand_poll = cand_poll_df.groupby(cand_poll_df['date'].dt.date)['pct_estimate'].mean()
-        daily_cand_poll_change = daily_cand_poll.diff().dropna()
-        
-        common_dates = daily_topic_sent_change.index.intersection(daily_cand_poll_change.index)
-        print(f"Candidate {cand}, Topic {topic}: {len(common_dates)} overlapping dates")
-        if len(common_dates) >= 2:
-            topic_changes = daily_topic_sent_change.loc[common_dates]
-            poll_changes = daily_cand_poll_change.loc[common_dates]
-            # Check if either series is constant.
-            if np.allclose(topic_changes, topic_changes.iloc[0]) or np.allclose(poll_changes, poll_changes.iloc[0]):
-                corr_data[cand][topic] = np.nan
-            else:
-                corr_coef, _ = pearsonr(topic_changes, poll_changes)
-                corr_data[cand][topic] = corr_coef
-        else:
-            corr_data[cand][topic] = np.nan
+# Add event annotation
+for _, event in events.iterrows():
+    fig4.add_vline(x=event['date'], line=dict(color='red', dash='dash'))
+    fig4.add_annotation(x=event['date'], y=10, text=event['event'], showarrow=True, arrowhead=2)
 
-corr_matrix = pd.DataFrame(corr_data).T  # Rows: candidates, Columns: topics
-
-print("\n=== Correlation Matrix Preview ===")
-print(corr_matrix.head())
-
-# =============================================================================
-# 8. Visualize the Correlation Matrix as a Single Heatmap
-# =============================================================================
-def plot_heatmap(matrix, title):
-    # Convert matrix to masked array to handle NaNs.
-    data = np.ma.masked_invalid(matrix.values)
-    
-    cmap = plt.cm.coolwarm.copy()
-    cmap.set_bad(color='gray')
-    
-    fig, ax = plt.subplots(figsize=(20, 10))
-    im = ax.imshow(data, aspect='auto', cmap=cmap, vmin=-1, vmax=1)
-    
-    ax.set_xticks(np.arange(len(matrix.columns)))
-    ax.set_yticks(np.arange(len(matrix.index)))
-    
-    xtick_labels = [topics_dict.get(str(topic), str(topic)) for topic in matrix.columns]
-    ytick_labels = matrix.index.tolist()
-    
-    ax.set_xticklabels(xtick_labels, rotation=90, fontsize=8)
-    ax.set_yticklabels(ytick_labels, fontsize=10)
-    
-    cbar = fig.colorbar(im, ax=ax)
-    cbar.set_label('Pearson Correlation Coefficient')
-    
-    plt.title(title)
-    plt.xlabel("Topic (Descriptive Label)")
-    plt.ylabel("Candidate")
-    plt.tight_layout()
-    plt.show()
-
-plot_heatmap(corr_matrix, "Correlation between Daily Changes in Topic Positive Sentiment and Polling Changes\n(Selected Candidates)")
+fig4.update_xaxes(tickangle=45)
+fig4.show()

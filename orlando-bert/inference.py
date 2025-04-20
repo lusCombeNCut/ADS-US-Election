@@ -1,11 +1,11 @@
 import os
 import glob
 import pandas as pd
+import numpy as np
 import torch
 import nltk
 from bertopic import BERTopic
-from transformers import AutoTokenizer, AutoModel
-from torch.nn import DataParallel
+from sentence_transformers import SentenceTransformer
 
 # 0) Monkey‑patch hf_hub_download to read local files only
 import huggingface_hub
@@ -23,7 +23,6 @@ DATA_FOLDER    = "/user/home/sv22482/work/usc-x-24-us-election"
 OUTPUT_FOLDER  = "/user/home/sv22482/work/ADS-US-Election/orlando-bert/inference-output"
 BATCH_SIZE     = 100_000
 EMB_BATCH      = 512
-MAXLEN         = 128
 MIN_LIKES      = 10
 MIN_RETWEETS   = 0
 # ==============
@@ -33,13 +32,11 @@ os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 # 1) GPU setup
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# 2) Load tokenizer & model onto GPU
-tokenizer = AutoTokenizer.from_pretrained("vinai/bertweet-base")
-bertweet_model = AutoModel.from_pretrained("vinai/bertweet-base").to(device)
-
-# 3) If multiple GPUs, wrap in DataParallel
-if torch.cuda.device_count() > 1:
-    bertweet_model = DataParallel(bertweet_model)
+# 2) Load the SAME embedding model used in training
+mpnet_model = SentenceTransformer(
+    "sentence-transformers/all-mpnet-base-v2",
+    device=device
+)
 
 def remove_links(text: str) -> str:
     """Remove words containing 'https' from text."""
@@ -67,31 +64,29 @@ def filter_data(df: pd.DataFrame) -> pd.DataFrame:
     print(f"    • After processing: {df.shape[0]}")
     return df
 
-def batch_embed(texts: list[str]) -> torch.Tensor:
-    """Tokenize & embed in sub-batches on GPU, return CPU tensor of CLS embeddings."""
+def batch_embed(texts: list[str]) -> np.ndarray:
+    """
+    Embed texts in EMB_BATCH chunks with MPNet,
+    return a (n_texts, dim) numpy array.
+    """
     all_embs = []
-    with torch.no_grad():
-        for i in range(0, len(texts), EMB_BATCH):
-            batch = texts[i:i+EMB_BATCH]
-            enc = tokenizer(
-                batch,
-                padding=True,
-                truncation=True,
-                max_length=MAXLEN,
-                return_tensors="pt"
-            ).to(device)
-            out = bertweet_model(**enc)
-            cls = out.last_hidden_state[:, 0, :].cpu()
-            all_embs.append(cls)
-    return torch.cat(all_embs, dim=0)
+    for i in range(0, len(texts), EMB_BATCH):
+        chunk = texts[i : i + EMB_BATCH]
+        embs = mpnet_model.encode(
+            chunk,
+            convert_to_numpy=True,
+            show_progress_bar=False
+        )
+        all_embs.append(embs)
+    return np.vstack(all_embs)
 
-# 4) Load your BERTopic model from the local PyTorch serialization
+# 3) Load your BERTopic model from the local PyTorch serialization
 topic_model = BERTopic.load(os.path.join(MODEL_PATH, "bertopic_model"))
 
-# (optional) restore original hf_hub_download to avoid side-effects elsewhere
+# (optional) restore original hf_hub_download
 huggingface_hub.hf_hub_download = _orig_hf_download
 
-# 5) Batched inference with filtering
+# 4) Batched inference with filtering and MPNet embeddings
 for part_dir in sorted(glob.glob(os.path.join(DATA_FOLDER, "part_*"))):
     print(f"Processing folder: {part_dir}")
     for in_file in sorted(glob.glob(os.path.join(part_dir, "*.csv.gz"))):
@@ -107,7 +102,7 @@ for part_dir in sorted(glob.glob(os.path.join(DATA_FOLDER, "part_*"))):
 
             docs = df_chunk['processed_text'].tolist()
             embeddings = batch_embed(docs)
-            topics, _ = topic_model.transform(docs, embeddings=embeddings.numpy())
+            topics, _ = topic_model.transform(docs, embeddings=embeddings)
             df_chunk['topic'] = topics
 
             out_path = os.path.join(OUTPUT_FOLDER, f"{base}_batch{batch_idx}.csv.gz")

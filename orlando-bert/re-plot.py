@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 from bertopic import BERTopic
 
 # ----- Settings: Update these paths as needed -----
-model_path = r"C:\Users\Orlan\Documents\Applied-Data-Science\ADS\version_3\bertopic_model"
-topics_path = r"C:\Users\Orlan\Documents\Applied-Data-Science\ADS\version_3\topics.csv.gz"
+model_path = "./orlando-bert/version_3/bertopic_model"
+topics_path = "./orlando-bert/version_3/topics.csv.gz"
 
 # ----- Load the model and topics data -----
 print("Loading BERTopic model...")
