@@ -16,71 +16,72 @@ def plot_all_sentiment():
     df.set_index('date', inplace=True)
     print("DATE SORTED")
 
-    sentiment_counts = pd.DataFrame()
+    for df in [df[df['irony'] == 'ironic'], df[df['irony'] == 'not ironic']]:
+        sentiment_counts = pd.DataFrame()
 
-    for sentiment in ['POS', 'NEG', 'NEU']:
-        sentiment_counts[sentiment] = (
-            df['sentiment'].eq(sentiment)
-            .resample('D')
-            .sum()
-        )
-    sentiment_counts['total'] = sentiment_counts.sum(axis=1)
-    sentiment_counts = sentiment_counts[sentiment_counts['total'] > 100]
-    print("SENTIMENT COUNTS DONE")
+        for sentiment in ['POS', 'NEG', 'NEU']:
+            sentiment_counts[sentiment] = (
+                df['sentiment'].eq(sentiment)
+                .resample('D')
+                .sum()
+            )
+        sentiment_counts['total'] = sentiment_counts.sum(axis=1)
+        sentiment_counts = sentiment_counts[sentiment_counts['total'] > 100]
+        print("SENTIMENT COUNTS DONE")
 
-    exp_alpha = 0.25
+        exp_alpha = 0.25
 
-    sentiment_counts['pos_smooth'] = sentiment_counts['POS'].ewm(alpha=exp_alpha, adjust=False).mean()
-    sentiment_counts['neu_smooth'] = sentiment_counts['NEU'].ewm(alpha=exp_alpha, adjust=False).mean()
-    sentiment_counts['neg_smooth'] = sentiment_counts['NEG'].ewm(alpha=exp_alpha, adjust=False).mean()
+        sentiment_counts['pos_smooth'] = sentiment_counts['POS'].ewm(alpha=exp_alpha, adjust=False).mean()
+        sentiment_counts['neu_smooth'] = sentiment_counts['NEU'].ewm(alpha=exp_alpha, adjust=False).mean()
+        sentiment_counts['neg_smooth'] = sentiment_counts['NEG'].ewm(alpha=exp_alpha, adjust=False).mean()
 
-    sentiment_props = pd.DataFrame()
-    sentiment_props['POS'] = sentiment_counts['POS'] / sentiment_counts['total']
-    sentiment_props['NEG'] = sentiment_counts['NEG'] / sentiment_counts['total']
-    sentiment_props['NEU'] = sentiment_counts['NEU'] / sentiment_counts['total']
+        sentiment_props = pd.DataFrame()
+        sentiment_props['POS'] = sentiment_counts['POS'] / sentiment_counts['total']
+        sentiment_props['NEG'] = sentiment_counts['NEG'] / sentiment_counts['total']
+        sentiment_props['NEU'] = sentiment_counts['NEU'] / sentiment_counts['total']
 
-    sentiment_props = sentiment_props.interpolate()
+        sentiment_props = sentiment_props.interpolate()
 
-    sentiment_props['pos_smooth'] = sentiment_props['POS'].ewm(alpha=exp_alpha, adjust=False).mean()
-    sentiment_props['neu_smooth'] = sentiment_props['NEU'].ewm(alpha=exp_alpha, adjust=False).mean()
-    sentiment_props['neg_smooth'] = sentiment_props['NEG'].ewm(alpha=exp_alpha, adjust=False).mean()
+        sentiment_props['pos_smooth'] = sentiment_props['POS'].ewm(alpha=exp_alpha, adjust=False).mean()
+        sentiment_props['neu_smooth'] = sentiment_props['NEU'].ewm(alpha=exp_alpha, adjust=False).mean()
+        sentiment_props['neg_smooth'] = sentiment_props['NEG'].ewm(alpha=exp_alpha, adjust=False).mean()
 
-    """
-    fig, ax = plt.subplots(2, 2)
-    ax[0][0].plot(sentiment_counts.index, sentiment_counts['POS'], 'g-', label='Positive')
-    ax[0][0].plot(sentiment_counts.index, sentiment_counts['NEG'], 'r-', label='Negative')
-    ax[0][0].plot(sentiment_counts.index, sentiment_counts['NEU'], 'b-', label='Neutral')
-    ax[0][0].set_title('counts unsmoothed')
-    ax[0][0].legend()
+        """
+        fig, ax = plt.subplots(2, 2)
+        ax[0][0].plot(sentiment_counts.index, sentiment_counts['POS'], 'g-', label='Positive')
+        ax[0][0].plot(sentiment_counts.index, sentiment_counts['NEG'], 'r-', label='Negative')
+        ax[0][0].plot(sentiment_counts.index, sentiment_counts['NEU'], 'b-', label='Neutral')
+        ax[0][0].set_title('counts unsmoothed')
+        ax[0][0].legend()
 
-    ax[0][1].plot(sentiment_counts.index, sentiment_counts['pos_smooth'], 'g-', label='Positive')
-    ax[0][1].plot(sentiment_counts.index, sentiment_counts['neg_smooth'], 'r-', label='Negative')
-    ax[0][1].plot(sentiment_counts.index, sentiment_counts['neu_smooth'], 'b-', label='Neutral')
-    ax[0][1].set_title('counts smoothed')
-    ax[0][1].legend()
+        ax[0][1].plot(sentiment_counts.index, sentiment_counts['pos_smooth'], 'g-', label='Positive')
+        ax[0][1].plot(sentiment_counts.index, sentiment_counts['neg_smooth'], 'r-', label='Negative')
+        ax[0][1].plot(sentiment_counts.index, sentiment_counts['neu_smooth'], 'b-', label='Neutral')
+        ax[0][1].set_title('counts smoothed')
+        ax[0][1].legend()
 
-    ax[1][0].plot(sentiment_counts.index, sentiment_props['POS'], 'g-', label='Positive')
-    ax[1][0].plot(sentiment_counts.index, sentiment_props['NEG'], 'r-', label='Negative')
-    ax[1][0].plot(sentiment_counts.index, sentiment_props['NEU'], 'b-', label='Neutral')
-    ax[1][0].set_title('props unsmoothed')
-    ax[1][0].legend()
+        ax[1][0].plot(sentiment_counts.index, sentiment_props['POS'], 'g-', label='Positive')
+        ax[1][0].plot(sentiment_counts.index, sentiment_props['NEG'], 'r-', label='Negative')
+        ax[1][0].plot(sentiment_counts.index, sentiment_props['NEU'], 'b-', label='Neutral')
+        ax[1][0].set_title('props unsmoothed')
+        ax[1][0].legend()
 
-    """
+        """
 
-    events = {
-        "Election Date": pd.Timestamp('2024-11-05')
-    }
+        events = {
+            "Election Date": pd.Timestamp('2024-11-05')
+        }
 
-    for event, dt in events.items():
-        plt.axvline(x=dt, color='black', linestyle='--', linewidth=2, label=event)
+        for event, dt in events.items():
+            plt.axvline(x=dt, color='black', linestyle='--', linewidth=2, label=event)
 
-    plt.plot(sentiment_counts.index, sentiment_props['pos_smooth'], 'g-', label='Positive')
-    plt.plot(sentiment_counts.index, sentiment_props['neg_smooth'], 'r-', label='Negative')
-    plt.plot(sentiment_counts.index, sentiment_props['neu_smooth'], 'b-', label='Neutral')
-    plt.title('Sentiment as a Proportion of Overall Tweets')
-    plt.legend()
+        plt.plot(sentiment_counts.index, sentiment_props['pos_smooth'], 'g-', label='Positive')
+        plt.plot(sentiment_counts.index, sentiment_props['neg_smooth'], 'r-', label='Negative')
+        plt.plot(sentiment_counts.index, sentiment_props['neu_smooth'], 'b-', label='Neutral')
+        plt.title('Sentiment as a Proportion of Overall Tweets')
+        plt.legend()
 
-    plt.show()
+        plt.show()
 
 
 def plot_topics():
