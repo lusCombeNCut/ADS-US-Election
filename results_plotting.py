@@ -9,9 +9,10 @@ from glob import glob
 # =============================================================================
 # 1. Load Topic Representations from JSON
 # =============================================================================
-topics_path = 'orlando-bert/version_3/bertopic_model/topics.json'
-inference_results_path = 'orlando-bert/topic-inference-results.csv'
-merged_path = 'merged_results_topicDates.csv'
+topics_path = r'HPC-output-dir\version_5\bertopic_model\topics.json'
+infer_low_path = r'orlando-bert\inference-output-low-filtering\topic-inference-results.csv'
+infer_high_path = r'orlando-bert\inference-output-high-filtering\topic-inference-results.csv'
+merged_path = 'merged_low_filter.csv'
 polling_path = 'presidential_primary_averages_2024.csv'
 sentiment_path = 'sentiment_results'
 
@@ -36,36 +37,33 @@ merged_df['week'] = merged_df['date_parsed'].dt.to_period('W').astype(str)  # Co
 weekly_tweet_volume = merged_df.groupby(merged_df['week']).size().reset_index(name='tweet_count')
 weekly_tweet_volume['source'] = 'Merged With sentiment and irony'
 
-inference_df = pd.read_csv(inference_results_path)
-inference_df['date_parsed'] = pd.to_datetime(inference_df['date_parsed'])
-inference_df['week'] = inference_df['date_parsed'].dt.to_period('W').astype(str)  # Convert to string
-inference_weekly_tweet_volume = inference_df.groupby(inference_df['week']).size().reset_index(name='tweet_count')
-inference_weekly_tweet_volume['source'] = 'Isolated Topic Inference'
+infer_low_df = pd.read_csv(infer_low_path)
+infer_low_df['date_parsed'] = pd.to_datetime(infer_low_df['date_parsed'])
+infer_low_df['week'] = infer_low_df['date_parsed'].dt.to_period('W').astype(str)  # Convert to string
+infer_low_weekly_tweet_volume = infer_low_df.groupby(infer_low_df['week']).size().reset_index(name='tweet_count')
+infer_low_weekly_tweet_volume['source'] = 'Isolated Topic Inference with low filtering'
 
 # Combine the two dataframes
-combined_df = pd.concat([weekly_tweet_volume, inference_weekly_tweet_volume])
+combined_df = pd.concat([weekly_tweet_volume, infer_low_weekly_tweet_volume], ignore_index=True)
 
-# Normalize tweet counts by weekly tweet volume (scaled between 0 and 1)
-max_tweet_count = weekly_tweet_volume['tweet_count'].max()
-min_tweet_count = weekly_tweet_volume['tweet_count'].min()
-combined_df['normalized_tweet_count'] = (combined_df['tweet_count'] - min_tweet_count) / (max_tweet_count - min_tweet_count)
+# remove all dates before 2024-01-01
+combined_df = combined_df[combined_df['week'] >= '2022-01-01']
+combined_df['week'] = combined_df['week'].astype(str)  # Convert to string for plotting
 
 # Plot the histogram with different colors for each source
-fig7 = px.bar(combined_df, x='week', y='normalized_tweet_count', color='source', barmode='group', title="Number of Tweets per Week (Normalized)")
+fig7 = px.bar(combined_df, x='week', y='tweet_count', color='source', barmode='group', title="Number of Tweets per Week")
 fig7.update_xaxes(tickangle=45)
-fig7.update_layout(title_text="Normalized Number of Tweets per Week (Combined)")
+fig7.update_layout(title_text="Number of Tweets per Week (Combined)")
 fig7.show()
+
 
 # =============================================================================
 # 4. Visualizations
 # =============================================================================
 # -- 1. Most Common Topic Each Week --
 weekly_topic_counts = merged_df.groupby(['week', 'topic_label']).size().reset_index(name='tweet_count')
-# Normalize tweet counts by weekly tweet volume
-weekly_topic_counts = pd.merge(weekly_topic_counts, weekly_tweet_volume, on='week', how='left')
-weekly_topic_counts['normalized_tweet_count'] = weekly_topic_counts['tweet_count_x'] / weekly_topic_counts['tweet_count_y']
 
-fig1 = px.line(weekly_topic_counts, x='week', y='normalized_tweet_count', color='topic_label', title='Most Common Topic Each Week (Normalized)')
+fig1 = px.line(weekly_topic_counts, x='week', y='tweet_count', color='topic_label', title='Most Common Topic Each Week')
 fig1.update_xaxes(tickangle=45)
 fig1.show()
 
@@ -74,11 +72,7 @@ top_topics = merged_df['topic_label'].value_counts().head(5).index
 filtered_df = merged_df[merged_df['topic_label'].isin(top_topics)]
 weekly_sentiment = filtered_df.groupby([filtered_df['date_parsed'].dt.to_period('W').astype(str), 'topic_label', 'sentiment']).size().reset_index(name='tweet_count')
 
-# Normalize sentiment data by weekly tweet volume
-weekly_sentiment = pd.merge(weekly_sentiment, weekly_tweet_volume, left_on='date_parsed', right_on='week', how='left')
-weekly_sentiment['normalized_tweet_count'] = weekly_sentiment['tweet_count_x'] / weekly_sentiment['tweet_count_y']
-
-fig2 = px.line(weekly_sentiment, x='date_parsed', y='normalized_tweet_count', color='sentiment', facet_col='topic_label', title="Sentiment Over Time for Top 5 Topics (Normalized)")
+fig2 = px.line(weekly_sentiment, x='date_parsed', y='tweet_count', color='sentiment', facet_col='topic_label', title="Sentiment Over Time for Top 5 Topics")
 fig2.update_xaxes(tickangle=45)
 fig2.show()
 
@@ -180,7 +174,7 @@ events = pd.DataFrame({
 })
 
 # Plot with political event annotations
-fig4 = px.line(weekly_topic_counts, x='week', y='normalized_tweet_count', color='topic_label', title='Most Common Topic Each Week (Normalized)')
+fig4 = px.line(weekly_topic_counts, x='week', y='tweet_count_x', color='topic_label', title='Most Common Topic Each Week')
 
 # Add event annotation
 for _, event in events.iterrows():

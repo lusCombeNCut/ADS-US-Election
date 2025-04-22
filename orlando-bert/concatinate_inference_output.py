@@ -3,7 +3,7 @@ import glob
 import pandas as pd
 
 # Configuration: adjust these paths as needed
-data_folder = "./orlando-bert/inference-output"
+data_folder = r"orlando-bert\inference-output-low-filtering"
 output_file = os.path.join(data_folder, "all_topics_combined.csv.gz")
 
 # Gather all batch output files
