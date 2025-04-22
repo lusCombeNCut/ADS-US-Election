@@ -130,6 +130,7 @@ def plot_topics():
     sentiment_props['neu_smooth'] = sentiment_props['NEU'].ewm(alpha=exp_alpha, adjust=False).mean()
     sentiment_props['neg_smooth'] = sentiment_props['NEG'].ewm(alpha=exp_alpha, adjust=False).mean()
 
+    """
     plt.figure(figsize=(12, 6))
     plt.plot(sentiment_counts.index, sentiment_counts['pos_smooth'], 'g-', label='Positive')
     plt.plot(sentiment_counts.index, sentiment_counts['neg_smooth'], 'r-', label='Negative')
@@ -137,6 +138,8 @@ def plot_topics():
 
     plt.title(f"{topic[1]} : {sub_df.shape[0]} Tweets")
     plt.legend()
+
+    """
 
     plt.figure(figsize=(12, 6))
     plt.plot(sentiment_counts.index, sentiment_props['pos_smooth'], 'g-', label='Positive')
@@ -168,5 +171,5 @@ def plot_topics():
     """
 
 
-plot_all_sentiment()
-# plot_topics()
+# plot_all_sentiment()
+plot_topics()
