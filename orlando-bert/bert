@@ -3,7 +3,6 @@ export PYTHONPATH="/user/home/$USER/:$PYTHONPATH"
 
 cd /user/home/sv22482/work/ADS-US-Election/orlando-bert
 
-pip3 install emoji==0.6.0
-pip install --prefix=$HOME/.local nltk contractions bertopic pandas
+pip install --prefix=$HOME/.local nltk contractions bertopic pandas emoji==0.6.0
 
 python BERTweet_sampled.py

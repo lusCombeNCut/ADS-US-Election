@@ -21,7 +21,7 @@ MIN_LIKES = 10
 MIN_RETWEETS = 0
 
 # Sampling parameters
-SAMPLE_FRAC = 0.01  # Adjust the fraction as needed
+SAMPLE_FRAC = 0.1  # Adjust the fraction as needed
 SAMPLE_SEED = 42   # Fixed seed for reproducibility
 
 # Combine custom stop words with NLTK stop words
@@ -149,12 +149,12 @@ def save_model(save_dir, topic_model: BERTopic, df):
 
 if __name__ == "__main__":
     # # HPC paths
-    # base_save_dir = "/user/home/sv22482/work/ADS-US-Election/orlando-bert/ADS"
-    # main_dir = "/user/work/sv22482/usc-x-24-us-election"
+    base_save_dir = "/user/home/sv22482/work/ADS-US-Election/orlando-bert/ADS"
+    main_dir = "/user/work/sv22482/usc-x-24-us-election"
 
     # Local paths for testing (uncomment if needed)
-    base_save_dir = r"C:\Users\Orlan\Documents\Applied-Data-Science"
-    main_dir = r"C:\Users\Orlan\Documents\usc-x-24-us-election-main"
+    #base_save_dir = r"C:\Users\Orlan\Documents\Applied-Data-Science"
+    #main_dir = r"C:\Users\Orlan\Documents\usc-x-24-us-election-main"
 
     parser = argparse.ArgumentParser(description="BERTopic Batch Training or Loading a Saved Model")
     parser.add_argument("--load_model", type=str, default=None,
