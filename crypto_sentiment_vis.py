@@ -6,6 +6,14 @@ import json
 import yfinance as yf
 import numpy as np
 
+#set font size for all plots
+plt.rcParams.update({'font.size': 14})
+plt.rcParams['axes.titlesize'] = 16
+
+# set fonts to times new roman
+plt.rcParams['font.family'] = 'Times New Roman'
+plt.rcParams['font.sans-serif'] = 'Times New Roman'
+
 def plot_all_sentiment():
     dfs = [pd.read_csv(f) for f in glob.glob("sentiment_results/*.csv")]
     print("ALL RES READ")
@@ -73,16 +81,18 @@ def plot_all_sentiment():
         events = {
             "Election Date": pd.Timestamp('2024-11-05')
         }
+        
+        plt.figure(figsize=(7, 6))
 
         for event, dt in events.items():
             plt.axvline(x=dt, color='black', linestyle='--', linewidth=2, label=event)
 
-        plt.plot(sentiment_counts.index, sentiment_props['pos_smooth'], 'g-', label='Positive')
-        plt.plot(sentiment_counts.index, sentiment_props['neg_smooth'], 'r-', label='Negative')
-        plt.plot(sentiment_counts.index, sentiment_props['neu_smooth'], 'b-', label='Neutral')
+        # Add different markers for each line
+        plt.plot(sentiment_counts.index, sentiment_props['pos_smooth'], 'g-o', markersize=5, markevery=5, label='Positive')
+        plt.plot(sentiment_counts.index, sentiment_props['neg_smooth'], 'r-s', markersize=5, markevery=5, label='Negative')
+        plt.plot(sentiment_counts.index, sentiment_props['neu_smooth'], 'b-^', markersize=5, markevery=5, label='Neutral')
         plt.title('Sentiment as a Proportion of Overall Tweets')
         plt.legend()
-
         plt.show()
 
 
@@ -154,11 +164,11 @@ def plot_topics():
     crypto_data['Close'] = crypto_data['Close'] / crypto_data['Close'].max()  # Normalize for comparison
 
     # Plot the original simple sentiment graph
-    plt.figure(figsize=(12, 6))
-    plt.plot(sentiment_counts.index, sentiment_props['pos_smooth'], 'g-', label='Positive Sentiment')
-    plt.plot(sentiment_counts.index, sentiment_props['neg_smooth'], 'r-', label='Negative Sentiment')
-    plt.plot(sentiment_counts.index, sentiment_props['neu_smooth'], 'b-', label='Neutral Sentiment')
-    plt.title(f"{topic_label} : {sub_df.shape[0]} Tweets - Simple Sentiment Graph")
+    plt.figure(figsize=(7, 6))
+    plt.plot(sentiment_counts.index, sentiment_props['pos_smooth'], 'g-o', markersize=5, markevery=5, label='Positive Sentiment')
+    plt.plot(sentiment_counts.index, sentiment_props['neg_smooth'], 'r-s', markersize=5, markevery=5, label='Negative Sentiment')
+    plt.plot(sentiment_counts.index, sentiment_props['neu_smooth'], 'b-^', markersize=5, markevery=5, label='Neutral Sentiment')
+    plt.title(f"{topic_label} : {sub_df.shape[0]} Tweets - Sentiment Graph")
     plt.legend()
     plt.show()
 
@@ -223,28 +233,34 @@ def plot_topics():
         all_correlation_results[metric_name] = pd.DataFrame(correlation_results, columns=['Delay', 'Correlation'])
 
     # Plot correlation coefficients for all metrics
-    plt.figure(figsize=(14, 8))
+    plt.figure(figsize=(7, 6))
+    # Use different marker shapes for each metric
+    markers = {'pos_neg_ratio': 'o', 'POS': 's', 'NEU': '^', 'inv_negative': 'D'}
     for metric_name, metric_label in sentiment_metrics.items():
         corr_df = all_correlation_results[metric_name]
-        plt.plot(corr_df['Delay'], corr_df['Correlation'], 'o-', label=metric_label)
+        plt.plot(corr_df['Delay'], corr_df['Correlation'], '-', marker=markers[metric_name], label=metric_label)
 
     plt.axhline(0, color='gray', linestyle='--', linewidth=1)
-    plt.title(f"Correlation of {crypto_ticker} Price with Various Sentiment Metrics")
+    plt.title(f"Correlation of {crypto_ticker} Price with \n Multiple Sentiment Metrics")
     plt.xlabel("Time Delay (Days)")
     plt.ylabel("Correlation Coefficient")
     plt.legend()
     plt.grid(True, alpha=0.3)
+    plt.axvline(x=corr_df['Delay'][corr_df['Correlation'].idxmax()], color='red', linestyle=':', label='Max Correlation Delay')
+    plt.gca().xaxis.set_minor_locator(plt.MultipleLocator(1))
+    plt.tight_layout()
     plt.show()
 
     # Plot sentiment and normalized crypto price for reference
-    plt.figure(figsize=(12, 6))
-    plt.plot(sentiment_counts.index, sentiment_props['pos_smooth'], 'g-', label='Positive Sentiment')
-    plt.plot(sentiment_counts.index, sentiment_props['neg_smooth'], 'b-', label='Negative Sentiment')
-    plt.plot(sentiment_counts.index, sentiment_props['neu_smooth'], 'b-', label='Neutral Sentiment')
-    plt.plot(crypto_data.index, crypto_data['Close'], 'k--', label=f'{crypto_ticker} Price (Normalized)')
-    plt.title(f"{topic_label} : {sub_df.shape[0]} Tweets with {crypto_ticker} Price")
+    plt.figure(figsize=(7, 6))
+    plt.plot(sentiment_counts.index, sentiment_props['pos_smooth'], 'g-o', markersize=5, markevery=5, label='Positive Sentiment')
+    plt.plot(sentiment_counts.index, sentiment_props['neg_smooth'], 'r-s', markersize=5, markevery=5, label='Negative Sentiment')
+    plt.plot(sentiment_counts.index, sentiment_props['neu_smooth'], 'b-^', markersize=5, markevery=5, label='Neutral Sentiment')
+    plt.plot(crypto_data.index, crypto_data['Close'], 'k--D', markersize=5, markevery=5, label=f'{crypto_ticker} Price (Normalized)')
+    plt.title(f"Crypto Price Versus Sentiment for the Crypto Topic")
     plt.legend()
-
+    plt.xticks(rotation=45)
+    plt.tight_layout()
     plt.show()
 
     """
