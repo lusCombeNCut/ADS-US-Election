@@ -6,13 +6,14 @@ import json
 import yfinance as yf
 import numpy as np
 
-#set font size for all plots
+# set font size for all plots
 plt.rcParams.update({'font.size': 14})
 plt.rcParams['axes.titlesize'] = 16
 
 # set fonts to times new roman
 plt.rcParams['font.family'] = 'Times New Roman'
 plt.rcParams['font.sans-serif'] = 'Times New Roman'
+
 
 def plot_all_sentiment():
     dfs = [pd.read_csv(f) for f in glob.glob("sentiment_results/*.csv")]
@@ -81,7 +82,7 @@ def plot_all_sentiment():
         events = {
             "Election Date": pd.Timestamp('2024-11-05')
         }
-        
+
         plt.figure(figsize=(7, 6))
 
         for event, dt in events.items():
@@ -96,7 +97,7 @@ def plot_all_sentiment():
         plt.show()
 
 
-def plot_topics():
+def plot_topics(exp_alpha=0.3):
     df = pd.read_csv("merged_low_filter.csv")
 
     df['date'] = pd.to_datetime(df['date'], format="%Y-%m-%d")
@@ -106,11 +107,12 @@ def plot_topics():
 
     # Get the topic labels from HPC-output-dir\version_5\bertopic_model\topics.json
     topics_path = r'HPC-output-dir\version_5\bertopic_model\topics.json'
+    # topics_path = "HPC-output-dir/version_5/bertopic_model/topics.json"
     with open(topics_path, 'r') as f:
         topics_data = json.load(f)
 
     # user selects topic number, script finds label in field "topic_labels: " of the json file
-    topic = 3 # 3 - crypto topic
+    topic = 3  # 3 - crypto topic
     topic_label = topics_data.get("topic_labels", {}).get(str(topic), None)
 
     sub_df = df[df['topic'] == topic].copy()
@@ -133,7 +135,6 @@ def plot_topics():
 
     sentiment_props = sentiment_props.interpolate()
 
-    exp_alpha = 0.3
     """
     sentiment_props['pos_smooth'] = sentiment_props['POS'].rolling(14, center=True).mean()
     sentiment_props['neu_smooth'] = sentiment_props['NEU'].rolling(14, center=True).mean()
@@ -192,7 +193,7 @@ def plot_topics():
     # Define which metrics to analyze
     sentiment_metrics = {
         'pos_neg_ratio': 'Positive/Negative Ratio',
-        'POS': 'Positive Sentiment',
+        'pos_smooth': 'Positive Sentiment',
         'NEU': 'Neutral Sentiment',
         'inv_negative': 'Inverse Negative'
     }
@@ -204,23 +205,23 @@ def plot_topics():
     # Calculate correlations for each metric
     for metric_name, metric_label in sentiment_metrics.items():
         correlation_results = []
-        
+
         for delay in range(max_delay + 1):
             # Shift sentiment data and align with crypto data
             shifted_sentiment = sentiment_aligned[metric_name].shift(delay)
-            
+
             crypto_series = crypto_aligned
             if isinstance(crypto_aligned, pd.DataFrame):
                 crypto_series = crypto_aligned.iloc[:, 0]
-            
+
             valid_data = pd.DataFrame({
                 'sentiment': shifted_sentiment,
                 'price': crypto_series
             }).dropna()
-            
-            if (len(valid_data) > 5 and 
-                valid_data['sentiment'].nunique() > 1 and 
-                valid_data['price'].nunique() > 1):
+
+            if (len(valid_data) > 5 and
+                valid_data['sentiment'].nunique() > 1 and
+                    valid_data['price'].nunique() > 1):
                 try:
                     correlation = valid_data['sentiment'].corr(valid_data['price'])
                     correlation_results.append((delay, correlation))
@@ -229,13 +230,13 @@ def plot_topics():
                     correlation_results.append((delay, float('nan')))
             else:
                 correlation_results.append((delay, float('nan')))
-        
+
         all_correlation_results[metric_name] = pd.DataFrame(correlation_results, columns=['Delay', 'Correlation'])
 
     # Plot correlation coefficients for all metrics
     plt.figure(figsize=(7, 6))
     # Use different marker shapes for each metric
-    markers = {'pos_neg_ratio': 'o', 'POS': 's', 'NEU': '^', 'inv_negative': 'D'}
+    markers = {'pos_neg_ratio': 'o', 'pos_smooth': 's', 'NEU': '^', 'inv_negative': 'D'}
     for metric_name, metric_label in sentiment_metrics.items():
         corr_df = all_correlation_results[metric_name]
         plt.plot(corr_df['Delay'], corr_df['Correlation'], '-', marker=markers[metric_name], label=metric_label)
@@ -284,4 +285,4 @@ def plot_topics():
 
 
 # plot_all_sentiment()
-plot_topics()
+plot_topics(0.1)

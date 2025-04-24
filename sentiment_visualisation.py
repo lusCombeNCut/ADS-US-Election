@@ -18,7 +18,7 @@ def sentiment_duplicates():
     df_duped = df[df.duplicated(subset=['id'], keep='first')]
     print("GOT DUPES")
     print(df_duped)
-    df_duped.to_csv('dupes.csv')
+    df_duped.to_csv('dupes.csv', index)
 
 
 def plot_all_sentiment():
