@@ -85,9 +85,9 @@ filtered_counts = filtered_counts.loc[top10]
 
 # Plot heatmap of proportions
 proportions = filtered_counts.div(totals, axis=0).loc[top10]
-proportions.columns = proportions.columns.str.split().str[:3].str.join(' ')
+proportions.columns = proportions.columns.str.split().str[:4].str.join(' ')
 
-plt.figure(figsize=(8,6))
+plt.figure(figsize=(8,8))
 sns.heatmap(
     proportions,
     cmap="YlGnBu",
@@ -103,64 +103,64 @@ plt.xticks(rotation=60, ha='right', fontsize=16)
 plt.yticks(fontsize=16)
 plt.show()
 
-# 1) Chi-Square Test of Independence
-chi2, p, dof, expected = chi2_contingency(filtered_counts)
-print(f"Chi2 statistic: {chi2:.2f}, dof: {dof}, p-value: {p:.4f}")
-if p < 0.05:
-    print("Significant difference: topic distribution depends on occupation.")
-else:
-    print("No significant difference in topic distributions across occupations.")
+# # 1) Chi-Square Test of Independence
+# chi2, p, dof, expected = chi2_contingency(filtered_counts)
+# print(f"Chi2 statistic: {chi2:.2f}, dof: {dof}, p-value: {p:.4f}")
+# if p < 0.05:
+#     print("Significant difference: topic distribution depends on occupation.")
+# else:
+#     print("No significant difference in topic distributions across occupations.")
 
-# Residuals heatmap
-residuals = (filtered_counts - expected) / np.sqrt(expected)
-plt.figure(figsize=(8,6))
-sns.heatmap(
-    residuals,
-    cmap="RdBu",
-    center=0,
-    annot=True,
-    fmt=".2f"
-)
-plt.title('Chi-Square Residuals', fontsize=18)
-plt.xlabel('Topic', fontsize=16)
-plt.ylabel('Occupation', fontsize=16)
-plt.xticks(rotation=60, ha='right', fontsize=16)
-plt.yticks(fontsize=16)
-plt.tight_layout()
-plt.show()
+# # Residuals heatmap
+# residuals = (filtered_counts - expected) / np.sqrt(expected)
+# plt.figure(figsize=(8,6))
+# sns.heatmap(
+#     residuals,
+#     cmap="RdBu",
+#     center=0,
+#     annot=True,
+#     fmt=".2f"
+# )
+# plt.title('Chi-Square Residuals', fontsize=18)
+# plt.xlabel('Topic', fontsize=16)
+# plt.ylabel('Occupation', fontsize=16)
+# plt.xticks(rotation=60, ha='right', fontsize=16)
+# plt.yticks(fontsize=16)
+# plt.tight_layout()
+# plt.show()
 
-# 2) Pairwise Chi-Square Tests
-occupations_list = filtered_counts.index.tolist()
-pval_matrix = pd.DataFrame(
-    np.ones((len(occupations_list), len(occupations_list))),
-    index=occupations_list,
-    columns=occupations_list
-)
-for occ1, occ2 in itertools.combinations(occupations_list, 2):
-    table = filtered_counts.loc[[occ1, occ2]]
-    _, p_pc, _, _ = chi2_contingency(table)
-    pval_matrix.loc[occ1, occ2] = p_pc
-    pval_matrix.loc[occ2, occ1] = p_pc
+# # 2) Pairwise Chi-Square Tests
+# occupations_list = filtered_counts.index.tolist()
+# pval_matrix = pd.DataFrame(
+#     np.ones((len(occupations_list), len(occupations_list))),
+#     index=occupations_list,
+#     columns=occupations_list
+# )
+# for occ1, occ2 in itertools.combinations(occupations_list, 2):
+#     table = filtered_counts.loc[[occ1, occ2]]
+#     _, p_pc, _, _ = chi2_contingency(table)
+#     pval_matrix.loc[occ1, occ2] = p_pc
+#     pval_matrix.loc[occ2, occ1] = p_pc
 
-print("\nPairwise Chi-Square p-values:")
-print(pval_matrix)
+# print("\nPairwise Chi-Square p-values:")
+# print(pval_matrix)
 
-# 3) Multinomial Logistic Regression
-# Prepare tweet-level data for top10 occupations and topics
-df_reg = df_filtered.copy()
-df_reg['topic_short'] = df_reg['topic_label'].str.split().str[:3].str.join(' ')
-keep_short = proportions.columns.tolist()
-df_reg = df_reg[
-    df_reg['topic_short'].isin(keep_short)
-]
-df_reg = df_reg[df_reg['inferred_occupation'].isin(top10)]
-df_reg['occupation_cat'] = df_reg['inferred_occupation'].astype('category')
-df_reg['topic_cat'] = df_reg['topic_short'].astype('category')
-# Design matrices for multinomial logit
-y, X = patsy.dmatrices('topic_cat ~ C(occupation_cat)', df_reg, return_type='dataframe')
-model = sm.MNLogit(y, X)
-res = model.fit(method='newton', maxiter=100, disp=False)
-print(res.summary())
+# # 3) Multinomial Logistic Regression
+# # Prepare tweet-level data for top10 occupations and topics
+# df_reg = df_filtered.copy()
+# df_reg['topic_short'] = df_reg['topic_label'].str.split().str[:3].str.join(' ')
+# keep_short = proportions.columns.tolist()
+# df_reg = df_reg[
+#     df_reg['topic_short'].isin(keep_short)
+# ]
+# df_reg = df_reg[df_reg['inferred_occupation'].isin(top10)]
+# df_reg['occupation_cat'] = df_reg['inferred_occupation'].astype('category')
+# df_reg['topic_cat'] = df_reg['topic_short'].astype('category')
+# # Design matrices for multinomial logit
+# y, X = patsy.dmatrices('topic_cat ~ C(occupation_cat)', df_reg, return_type='dataframe')
+# model = sm.MNLogit(y, X)
+# res = model.fit(method='newton', maxiter=100, disp=False)
+# print(res.summary())
 
 
 

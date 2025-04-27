@@ -19,7 +19,7 @@ topics = pd.read_csv('./results-data/new_merged_sentiment_topic.csv',
 topic_counts = topics['topic'].value_counts().sort_index()
 
 
-plt.figure(figsize=(6, 5))
+plt.figure(figsize=(5, 3))
 
 bar_colors = ['#2164dc' if ((i-1) % 5 != 0) else '#00d0ee' for i in range(len(topic_counts))]
 
@@ -38,19 +38,19 @@ plt.grid(axis='y', which='minor', linestyle=':', alpha=0.5)  # Add minor y-axis 
 plt.tight_layout()
 plt.show()
 
-# Calculate percentage of tweets per topic
-topic_percentages = (topic_counts / topic_counts.sum()) * 100
+# # Calculate percentage of tweets per topic
+# topic_percentages = (topic_counts / topic_counts.sum()) * 100
 
-plt.figure(figsize=(6, 5))
+# plt.figure(figsize=(5, 3))
 
-sns.barplot(x=topic_percentages.index, y=topic_percentages.values, palette=bar_colors)
-plt.xlabel('Topic ID')
-plt.ylabel('Percentage of Tweets')
-plt.title('Percentage of Tweets per Topic')
+# sns.barplot(x=topic_percentages.index, y=topic_percentages.values, palette=bar_colors)
+# plt.xlabel('Topic ID')
+# plt.ylabel('Percentage of Tweets')
+# plt.title('Percentage of Tweets per Topic')
 
-xtick_labels = [label if (i-1) % 5 == 0 else '' for i, label in enumerate(topic_percentages.index)]
-plt.xticks(ticks=range(len(topic_percentages.index)), labels=xtick_labels)
+# xtick_labels = [label if (i-1) % 5 == 0 else '' for i, label in enumerate(topic_percentages.index)]
+# plt.xticks(ticks=range(len(topic_percentages.index)), labels=xtick_labels)
 
-plt.grid(axis='y', linestyle='--', alpha=0.7)
-plt.tight_layout()
-plt.show()
+# plt.grid(axis='y', linestyle='--', alpha=0.7)
+# plt.tight_layout()
+# plt.show()

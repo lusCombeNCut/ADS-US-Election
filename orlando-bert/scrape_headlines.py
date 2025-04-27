@@ -60,29 +60,23 @@ KEYWORDS = [
 
 
 def build_search_query(keywords):
-    """
-    Builds a search query string for the API.
-    Example: 'election | government | senate | president | congress'
-    """
     return ' | '.join(keywords)
 
 def fetch_top_headline(start_date, end_date):
-    """
-    Fetches the top U.S. politics headline between start_date and end_date.
-    Returns a dictionary with headline information.
-    """
     search_query = build_search_query(KEYWORDS)
 
     params = {
     'api_token': API_TOKEN,
     'language': 'en',
     'categories': 'politics',
-    'search': search_query,
+    # 'search': search_query,
     'search_fields': 'title,description,main_text',  # <--- updated here
     'published_after': start_date.strftime('%Y-%m-%d'),
     'published_before': end_date.strftime('%Y-%m-%d'),
     'sort': 'relevance_score',
-    'limit': 1,}
+    'limit': 1,
+    'domains': 'www.nytimes.com' 
+    }
 
 
     try:
@@ -140,14 +134,13 @@ def main():
     
     if DEBUG:
         # Only fetch one week's headline for debugging
-        current_date = datetime(2024, 6, 14)
+        current_date = datetime(2024, 6, 1)
         week_end = current_date + timedelta(days=6)
         headline_data = fetch_top_headline(current_date, week_end)
         headlines.append(headline_data)
     else:
-        # Fetch for all weeks of 2024
-        current_date = datetime(2024, 1, 1)
-        end_date = datetime(2024, 12, 31)
+        current_date = datetime(2024, 6, 1)
+        end_date = datetime(2024, 11, 30)
 
         while current_date <= end_date:
             week_end = current_date + timedelta(days=6)
@@ -161,9 +154,9 @@ def main():
     
     # Different CSV filenames depending on mode
     if DEBUG:
-        csv_filename = 'weekly_headlines_debug.csv'
+        csv_filename = 'weekly__wsj_headlines_debug.csv'
     else:
-        csv_filename = 'weekly_headlines_full.csv'
+        csv_filename = 'weekly_wsj_headlines_full.csv'
 
     fieldnames = ['week_start', 'week_end', 'title', 'source', 'published_at', 'url', 'description']
     
