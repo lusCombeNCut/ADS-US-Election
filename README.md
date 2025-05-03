@@ -1,6 +1,6 @@
 ﻿# ADS-US-Election
  
-This repository has been created to share worked completed on the Univeristy of Bristol's (Applied Data Science) COMSM0055 unit. Below is the abstract of the paper, please see the report.pdf for the full text.
+This repository has been created to share worked completed on the Univeristy of Bristol's (Applied Data Science) COMSM0055 unit. Below is the abstract of the paper, please see the ```report.pdf``` for the full text.
 
 This study applies a multi-model NLP approach
 over 2.8 million tweets related to the 2024 U.S. presidential
